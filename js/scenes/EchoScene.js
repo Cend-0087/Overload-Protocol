@@ -6,10 +6,8 @@ class EchoScene extends Phaser.Scene {
     create() {
         this.updateViewports();
 
-        // Слушаем изменение размера окна
         this.scale.on('resize', this.updateViewports, this);
 
-        // Фон камеры
         this.cameras.main.setBackgroundColor('#0a0a0a');
 
         // Игрок
@@ -17,7 +15,7 @@ class EchoScene extends Phaser.Scene {
         this.physics.add.existing(this.player);
         this.player.body.setCollideWorldBounds(true);
 
-        // Тестовые стены
+        // Стены
         this.walls = this.physics.add.staticGroup();
         this.walls.create(200, 200, null).setSize(300, 20).setVisible(false);
         this.walls.create(600, 500, null).setSize(400, 20).setVisible(false);
@@ -38,22 +36,45 @@ class EchoScene extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
         this.keys = this.input.keyboard.addKeys('W,A,S,D,SPACE');
 
-        // Тонкая разделительная линия (будет обновляться при ресайзе)
-        this.divider = this.add.rectangle(0, 0, 4, this.scale.height, 0x333333).setOrigin(0, 0);
+        // === ДРАГ-РАЗДЕЛИТЕЛЬ ===
+        this.divider = this.add.rectangle(0, 0, 6, this.scale.height, 0x555555)
+            .setOrigin(0.5, 0)
+            .setInteractive({ cursor: 'col-resize' });
+
+        this.divider.on('pointerdown', () => {
+            this.registry.set('isDraggingDivider', true);
+        });
+
+        // Глобальный обработчик движения мыши (через main scene или input)
+        this.input.on('pointermove', (pointer) => {
+            if (!this.registry.get('isDraggingDivider')) return;
+
+            const newUiWidth = this.scale.width - pointer.x;
+            const clamped = Phaser.Math.Clamp(newUiWidth, 320, 520); // мин 320px, макс 520px
+
+            this.registry.set('uiWidth', clamped);
+            this.updateViewports();           // сразу обновляем левую зону
+            this.scene.get('UIScene').updateViewports(); // и правую
+        });
+
+        this.input.on('pointerup', () => {
+            this.registry.set('isDraggingDivider', false);
+        });
+
+        // Делаем divider всегда поверх всего
+        this.divider.setDepth(100);
     }
 
     updateViewports() {
         const totalWidth = this.scale.width;
         const uiWidth = this.registry.get('uiWidth');
-        const echoWidth = Math.max(totalWidth - uiWidth, 600); // минимум 600px для Echo
+        const echoWidth = Math.max(totalWidth - uiWidth, 600);
 
-        // Обновляем viewport левой зоны
         this.cameras.main.setViewport(0, 0, echoWidth, this.scale.height);
 
-        // Разделительная линия всегда по краю Echo-зоны
         if (this.divider) {
-            this.divider.setPosition(echoWidth - 2, 0);
-            this.divider.setDisplaySize(4, this.scale.height);
+            this.divider.setPosition(echoWidth, 0);
+            this.divider.setDisplaySize(6, this.scale.height);
         }
     }
 
