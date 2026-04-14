@@ -4,37 +4,52 @@ class UIScene extends Phaser.Scene {
     }
 
     create() {
-        // Правая панель
-        this.add.rectangle(900, 0, 380, 720, 0x1a1a1a).setOrigin(0);
-        
-        this.add.text(950, 40, 'SYSTEM INTERFACE', {
-            fontSize: '22px',
-            color: '#ffcc00'
+        this.updateViewports();
+        this.scale.on('resize', this.updateViewports, this);
+
+        this.cameras.main.setBackgroundColor('#1a1a1a');
+
+        this.add.text(30, 40, 'SYSTEM INTERFACE', {
+            fontSize: '24px',
+            color: '#ffcc00',
+            fontFamily: 'Courier New'
+        }).setShadow(0, 0, '#ffff00', 3);
+
+        this.memoryText = this.add.text(30, 120, 'MEMORY: 0/45', {
+            fontSize: '20px',
+            color: '#00ffcc',
+            fontFamily: 'Courier New'
         });
 
-        this.memoryText = this.add.text(950, 100, 'MEMORY: 0/45', {
+        this.attentionText = this.add.text(30, 170, 'ATTENTION: 0%', {
             fontSize: '18px',
-            color: '#00ffcc'
+            color: '#ff6666',
+            fontFamily: 'Courier New'
         });
 
-        // Обновляем текст каждые 200 мс
         this.time.addEvent({
-            delay: 200,
+            delay: 150,
             callback: this.updateUI,
             callbackScope: this,
             loop: true
         });
     }
 
+    updateViewports() {
+        const totalWidth = this.scale.width;
+        const uiWidth = this.registry.get('uiWidth');
+        const echoWidth = Math.max(totalWidth - uiWidth, 600);
+
+        this.cameras.main.setViewport(echoWidth, 0, uiWidth, this.scale.height);
+    }
+
     updateUI() {
         const mem = this.registry.get('memory');
         const max = this.registry.get('maxMemory');
+        const att = this.registry.get('attention');
+
         this.memoryText.setText(`MEMORY: ${mem}/${max}`);
-        
-        if (mem > max * 0.8) {
-            this.memoryText.setColor('#ff4444');
-        } else {
-            this.memoryText.setColor('#00ffcc');
-        }
+        this.memoryText.setColor(mem > max * 0.75 ? '#ff4444' : '#00ffcc');
+        this.attentionText.setText(`ATTENTION: ${att}%`);
     }
 }
