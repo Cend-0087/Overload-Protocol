@@ -3,48 +3,88 @@ class EchoScene extends Phaser.Scene {
         super({ key: 'EchoScene', active: true });
     }
 
+    // ====================== НАСТРОЙКИ (всё важное собрано здесь) ======================
+    // Меняй значения здесь — они сразу применяются при перезапуске или во время игры
+    gameConfig = {
+        // === Цвета ===
+        bgColor: '#0a0a0a',      // Цвет фона
+            // Цвет стен. Реальное значение должно соответствовать цвету фона (для теста - 0x444444)
+
+        // === Игрок ===
+        playerSpeed: 180,                    // скорость движения WASD
+
+        // === Lidar (основная механика) ===
+        rayCount: 20,                        // сколько лучей испускается за один импульс
+        maxRayCount: 1000,                   // максимум при полной прокачке (для будущего)
+        maxDistance: 520,                    // максимальная дальность луча в пикселях
+
+        lineThickness: 1.8,                  // толщина линии луча
+        lineColor: 0x00ffff,                 // цвет луча (голубой)
+        lineAlpha: 0.75,                     // прозрачность линии
+
+        propagationTime: 300,                // сколько миллисекунд луч "вырастает" от игрока
+        fadeTime: 1100,                      // сколько миллисекунд луч затухает после полного распространения
+
+        cooldownTime: 0.0,                   // задержка между импульсами (сейчас 0 для тестов)
+
+        memoryPerHit: 1,                     // сколько единиц памяти добавляется за каждое попадание
+
+        // === Визуальные эффекты ===
+        hitSparkRadius: 7,                   // размер искры при попадании в стену
+        hitSparkColor: 0x88ffff,
+
+        // === Оптимизация точек памяти ===
+        memoryPointMergeDistance: 3,         // если новая точка ближе этой дистанции к существующей — не создаём дубликат
+
+        // === Карта: стены ===
+        // x, y — центр прямоугольника
+        // width, height — размер
+        // color — цвет в hex
+        wallsData: [
+            { x: 700, y: 300, width: 20,  height: 400, color: 0x000000 }, // вертикальная стена
+            { x: 400, y: 100, width: 300, height: 20,  color: 0x000000 }, // горизонтальная сверху
+            { x: 950, y: 500, width: 20,  height: 300, color: 0x000000 }, // вертикальная справа
+            // Добавляй новые стены сюда одной строкой ↓
+        ]
+    };
+
     create() {
+        // Адаптивные viewport'ы (левая зона + правая панель)
         this.updateViewports();
         this.scale.on('resize', this.updateViewports, this);
 
-        this.cameras.main.setBackgroundColor('#0a0a0a');
+        // Фон игровой области
+        this.cameras.main.setBackgroundColor('bgColor');
 
-        // Игрок
+        // ====================== ИГРОК ======================
         this.player = this.add.circle(450, 360, 8, 0x00ffff);
         this.physics.add.existing(this.player);
         this.player.body.setCollideWorldBounds(true);
 
-        // === ИСПРАВЛЕННАЯ СТЕНА ===
+        // ====================== СТЕНЫ ======================
         this.walls = this.physics.add.staticGroup();
-        
-        // Видимая стена + физическое тело в одном объекте
-        this.testWall = this.add.rectangle(700, 300, 20, 400, 0x444444);
-        const wallBody = this.physics.add.staticBody(400, 300, 60, 500);
-        this.testWall.body = wallBody;           // привязываем
-        this.walls.add(this.testWall);           // добавляем в группу
+        this.createWalls();                    // создаём все стены из gameConfig.wallsData
 
-        // Коллизия игрока со стеной
+        // Коллизия игрока со всеми стенами
         this.physics.add.collider(this.player, this.walls);
 
-        // Группа точек памяти
+        // Группа для точек памяти (отметки от лидара)
         this.memoryPoints = this.add.group();
 
-        // Подсказки
+        // ====================== ПОДСКАЗКИ ======================
         this.add.text(30, 30, 'DARK ECHO AREA', {
-            fontSize: '20px',
-            color: '#00ffcc',
-            fontFamily: 'Courier New'
+            fontSize: '20px', color: '#00ffcc', fontFamily: 'Courier New'
         }).setShadow(0, 0, '#00ffff', 5);
 
         this.add.text(30, 70, 'WASD — move\nSPACE — Emit Lidar Pulse', {
-            fontSize: '16px',
-            color: '#00ccaa'
+            fontSize: '16px', color: '#00ccaa'
         });
 
+        // ====================== УПРАВЛЕНИЕ ======================
         this.cursors = this.input.keyboard.createCursorKeys();
         this.keys = this.input.keyboard.addKeys('W,A,S,D,SPACE');
 
-        // Драг-разделитель
+        // ====================== ДРАГ-РАЗДЕЛИТЕЛЬ ======================
         this.divider = this.add.rectangle(0, 0, 6, this.scale.height, 0x555555)
             .setOrigin(0.5, 0)
             .setInteractive({ cursor: 'col-resize' })
@@ -53,17 +93,41 @@ class EchoScene extends Phaser.Scene {
         this.divider.on('pointerdown', () => this.registry.set('isDraggingDivider', true));
         this.input.on('pointermove', this.handleDividerDrag, this);
         this.input.on('pointerup', () => this.registry.set('isDraggingDivider', false));
+
+        // Время последнего импульса (для cooldown)
+        this.lastPulseTime = 0;
     }
 
+    // ====================== СОЗДАНИЕ СТЕН ======================
+    // Очень удобный метод: все стены описываются в gameConfig.wallsData
+    createWalls() {
+        const cfg = this.gameConfig;
+
+        cfg.wallsData.forEach(data => {
+            // Создаём видимый серый прямоугольник
+            const wall = this.add.rectangle(data.x, data.y, data.width, data.height, data.color);
+
+            // Добавляем ему статическую физику (игрок не сможет пройти сквозь)
+            this.physics.add.existing(wall, true);   // true = static body
+
+            // Добавляем в группу стен
+            this.walls.add(wall);
+        });
+    }
+
+    // Обработка перетаскивания разделителя между Echo и UI
     handleDividerDrag(pointer) {
         if (!this.registry.get('isDraggingDivider')) return;
+
         const newUiWidth = this.scale.width - pointer.x;
         const clamped = Phaser.Math.Clamp(newUiWidth, 320, 520);
+
         this.registry.set('uiWidth', clamped);
         this.updateViewports();
         this.scene.get('UIScene').updateViewports();
     }
 
+    // Обновление размеров камер при изменении окна
     updateViewports() {
         const totalWidth = this.scale.width;
         const uiWidth = this.registry.get('uiWidth');
@@ -78,68 +142,71 @@ class EchoScene extends Phaser.Scene {
     }
 
     update() {
-        const speed = 180;
+        const cfg = this.gameConfig;
+
+        // Движение игрока
         this.player.body.setVelocity(0);
 
-        if (this.cursors.left.isDown || this.keys.A.isDown) this.player.body.setVelocityX(-speed);
-        if (this.cursors.right.isDown || this.keys.D.isDown) this.player.body.setVelocityX(speed);
-        if (this.cursors.up.isDown || this.keys.W.isDown) this.player.body.setVelocityY(-speed);
-        if (this.cursors.down.isDown || this.keys.S.isDown) this.player.body.setVelocityY(speed);
+        if (this.cursors.left.isDown || this.keys.A.isDown) this.player.body.setVelocityX(-cfg.playerSpeed);
+        if (this.cursors.right.isDown || this.keys.D.isDown) this.player.body.setVelocityX(cfg.playerSpeed);
+        if (this.cursors.up.isDown || this.keys.W.isDown) this.player.body.setVelocityY(-cfg.playerSpeed);
+        if (this.cursors.down.isDown || this.keys.S.isDown) this.player.body.setVelocityY(cfg.playerSpeed);
 
+        // Импульс лидара с учётом cooldown
         if (Phaser.Input.Keyboard.JustDown(this.keys.SPACE)) {
-            this.emitLidarPulse();
+            const now = this.time.now / 1000;
+            if (now - this.lastPulseTime >= cfg.cooldownTime) {
+                this.emitLidarPulse();
+                this.lastPulseTime = now;
+            }
         }
     }
 
-    // ====================== УЛУЧШЕННЫЙ LIDAR ======================
+    // ====================== ОСНОВНАЯ МЕХАНИКА LIDAR ======================
     emitLidarPulse() {
-        const rayCount = 20;           // оптимально для теста
-        const maxDistance = 520;
+        const cfg = this.gameConfig;
         const startX = this.player.x;
         const startY = this.player.y;
 
-        for (let i = 0; i < rayCount; i++) {
-            const angle = Math.random() * Math.PI * 2;
+        for (let i = 0; i < cfg.rayCount; i++) {
+            const angle = Math.random() * Math.PI * 2;   // случайное направление
 
-            const result = this.castRay(startX, startY, angle, maxDistance);
+            // Вычисляем куда попадёт луч
+            const result = this.castRay(startX, startY, angle, cfg.maxDistance);
 
-            // Создаём линию (сначала очень короткую)
+            // Рисуем луч (сначала нулевой длины)
             const line = this.add.graphics();
-            line.lineStyle(1.8, 0x00ffff, 0.75);   // тоньше и мягче
+            line.lineStyle(cfg.lineThickness, cfg.lineColor, cfg.lineAlpha);
             line.moveTo(startX, startY);
-            line.lineTo(startX, startY);           // начинаем с нулевой длины
+            line.lineTo(startX, startY);
             line.strokePath();
 
-            // Анимация распространения + затухание
+            // Анимация: луч постепенно распространяется, потом затухает
             this.tweens.add({
                 targets: line,
-                props: {
-                    scaleX: 1,           // Phaser сам растянет линию
-                    alpha: 0
-                },
-                duration: 180,           // время "выстрела" луча
+                props: { scaleX: 1, alpha: 0 },
+                duration: cfg.propagationTime,
                 ease: 'Sine.easeOut',
                 onUpdate: () => {
-                    // На каждом шаге перерисовываем линию до текущей длины
                     line.clear();
-                    line.lineStyle(1.8, 0x00ffff, 0.75);
+                    line.lineStyle(cfg.lineThickness, cfg.lineColor, cfg.lineAlpha);
                     line.moveTo(startX, startY);
-                    const currentLen = result.distance * (line.scaleX || 1);
+                    const currentDist = result.distance * (line.scaleX || 1);
                     line.lineTo(
-                        startX + Math.cos(angle) * currentLen,
-                        startY + Math.sin(angle) * currentLen
+                        startX + Math.cos(angle) * currentDist,
+                        startY + Math.sin(angle) * currentDist
                     );
                     line.strokePath();
                 },
                 onComplete: () => line.destroy()
             });
 
-            // Если попали в стену
+            // Если луч попал в стену
             if (result.hit) {
-                const point = this.add.circle(result.x, result.y, 3.5, 0x00ffcc, 1);
-                this.memoryPoints.add(point);
+                this.createMemoryPoint(result.x, result.y);
 
-                const spark = this.add.circle(result.x, result.y, 5.5, 0x88ffff, 0.85);
+                // Искра в месте попадания
+                const spark = this.add.circle(result.x, result.y, cfg.hitSparkRadius, cfg.hitSparkColor, 0.85);
                 this.tweens.add({
                     targets: spark,
                     radius: 1,
@@ -148,54 +215,74 @@ class EchoScene extends Phaser.Scene {
                     onComplete: () => spark.destroy()
                 });
 
-                let mem = this.registry.get('memory');
-                this.registry.set('memory', Math.min(mem + 1, this.registry.get('maxMemory')));
+                // Добавляем память
+                let currentMem = this.registry.get('memory');
+                this.registry.set('memory', Math.min(currentMem + cfg.memoryPerHit, this.registry.get('maxMemory')));
             }
         }
     }
 
-    castRay(x, y, angle, maxDist) {
+    // Создаёт точку памяти с проверкой на дубликаты
+    createMemoryPoint(x, y) {
+        const cfg = this.gameConfig;
+        let merged = false;
+
+        this.memoryPoints.getChildren().forEach(point => {
+            if (Phaser.Math.Distance.Between(x, y, point.x, point.y) <= cfg.memoryPointMergeDistance) {
+                merged = true;
+            }
+        });
+
+        if (!merged) {
+            this.memoryPoints.add(this.add.circle(x, y, 3.5, 0x00ffcc, 1));
+        }
+    }
+
+    // ====================== РЕЙКАСТ (новый чистый вариант) ======================
+    // Проверяет пересечение луча со всеми стенами
+    castRay(startX, startY, angle, maxDist) {
         const dx = Math.cos(angle);
         const dy = Math.sin(angle);
 
-        const wallBounds = this.testWall.getBounds();
-        let closestT = maxDist;
+        let closestDist = maxDist;
         let hitDetected = false;
 
-        const sides = [
-            { x1: wallBounds.left, y1: wallBounds.top, x2: wallBounds.left, y2: wallBounds.bottom },
-            { x1: wallBounds.right, y1: wallBounds.top, x2: wallBounds.right, y2: wallBounds.bottom },
-            { x1: wallBounds.left, y1: wallBounds.top, x2: wallBounds.right, y2: wallBounds.top },
-            { x1: wallBounds.left, y1: wallBounds.bottom, x2: wallBounds.right, y2: wallBounds.bottom }
-        ];
+        // Перебираем все стены
+        this.walls.getChildren().forEach(wall => {
+            const body = wall.body;
+            if (!body) return;
 
-        for (let side of sides) {
-            const t = this.getRaySegmentIntersection(x, y, dx, dy, side.x1, side.y1, side.x2, side.y2);
-            if (t !== null && t > 0.001 && t < closestT) {
-                closestT = t;
+            // Границы прямоугольника стены
+            const left   = body.x;
+            const right  = body.x + body.width;
+            const top    = body.y;
+            const bottom = body.y + body.height;
+
+            // Классический алгоритм пересечения луча с AABB (axis-aligned bounding box)
+            const t1 = (left   - startX) / dx;
+            const t2 = (right  - startX) / dx;
+            const t3 = (top    - startY) / dy;
+            const t4 = (bottom - startY) / dy;
+
+            const tmin = Math.max(Math.min(t1, t2), Math.min(t3, t4));
+            const tmax = Math.min(Math.max(t1, t2), Math.max(t3, t4));
+
+            if (tmax < 0 || tmin > tmax) return;   // луч не пересекает эту стену
+
+            const t = (tmin < 0) ? tmax : tmin;    // берём ближайшую точку пересечения
+
+            if (t > 0 && t < closestDist) {
+                closestDist = t;
                 hitDetected = true;
             }
-        }
+        });
 
-        const endX = x + dx * closestT;
-        const endY = y + dy * closestT;
-
+        // Возвращаем точку попадания и дистанцию
         return {
-            x: endX,
-            y: endY,
+            x: startX + dx * closestDist,
+            y: startY + dy * closestDist,
             hit: hitDetected,
-            distance: closestT
+            distance: closestDist
         };
-    }
-
-    getRaySegmentIntersection(rx, ry, rdx, rdy, x1, y1, x2, y2) {
-        const den = (x2 - x1) * rdy - (y2 - y1) * rdx;
-        if (Math.abs(den) < 0.0001) return null;
-
-        const t = ((rx - x1) * (y2 - y1) - (ry - y1) * (x2 - x1)) / den;
-        const u = -((rx - x1) * rdy - (ry - y1) * rdx) / den;
-
-        if (t > 0.001 && u >= 0 && u <= 1) return t;
-        return null;
     }
 }
