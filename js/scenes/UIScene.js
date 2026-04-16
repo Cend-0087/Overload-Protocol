@@ -33,7 +33,7 @@ class UIScene extends Phaser.Scene {
         this.consoleCamera.ignore(this.uiElements);
 
         // 6. Только ТЕПЕРЬ вызываем обновление вьюпортов и вешаем ресайз
-        this.updateViewports(); 
+        this.updateViewports();
         this.scale.on('resize', this.updateViewports, this);
 
         // ... остальной код (tweens, input.on('pointerdown'), keyboard.on) остается без изменений ...
@@ -83,15 +83,15 @@ class UIScene extends Phaser.Scene {
 
     handleTyping(event) {
         if (!this.isInputActive) return;
-    
+
         // 1. Если нажат Enter
         if (event.key === 'Enter') {
             const command = this.inputText.text;
             this.isInputActive = false; // Блокируем ввод на время анимации
-        
+
             this.flashTerminalConfirm(() => {
                 this.executeCommand(command);
-                
+
                 // Очищаем текст и возвращаем курсор в начало через небольшую паузу
                 // чтобы игрок успел увидеть результат (красный/бирюзовый цвет)
                 this.time.delayedCall(400, () => {
@@ -103,15 +103,15 @@ class UIScene extends Phaser.Scene {
             });
             return;
         }
-    
+
         // 2. Если нажат Backspace
         if (event.key === 'Backspace') {
             this.inputText.setText(this.inputText.text.slice(0, -1));
-        } 
+        }
         // 3. Если нажат Escape
         else if (event.key === 'Escape') {
             this.deactivateInput();
-        } 
+        }
         // 4. Печать символа (проверяем, что это один символ и не служебная клавиша)
         else if (event.key.length === 1 && event.code !== 'Slash') {
             // Принудительно ставим белый цвет, если до этого была ошибка (красный)
@@ -120,33 +120,51 @@ class UIScene extends Phaser.Scene {
             }
             this.inputText.setText(this.inputText.text + event.key);
         }
-    
+
         // ВАЖНО: Обновляем положение курсора ВСЕГДА в конце метода
         this.cursorRect.setX(this.inputText.x + this.inputText.width + 2);
     }
-    
+
     executeCommand(cmd) {
         cmd = cmd.toLowerCase().trim();
         if (cmd === '') return;
-    
+
         if (cmd === 'clear') {
             this.registry.set('memory', 0);
             this.events.emit('command-clear');
-            this.inputText.setColor('#00ffcc'); // Подсветка успеха
+            this.inputText.setColor('#00ffcc');
         } else {
-            this.inputText.setColor('#ff4444'); // Подсветка ошибки
-            // Эффект тряски при ошибке
-            this.tweens.add({
-                targets: this.commandLineContainer,
-                x: { from: 0, to: 5 },
-                duration: 50,
-                yoyo: true,
-                repeat: 3,
-                onComplete: () => this.commandLineContainer.setX(0)
+            this.inputText.setColor('#ff4444');
+
+            // Берем все камеры
+            const cams = [this.cameras.main, this.consoleCamera, this.scene.get('EchoScene').cameras.main];
+
+            cams.forEach(cam => {
+                // 1. Добавляем пайплайн (если его еще нет)
+                cam.setPostPipeline(GlitchPipeline);
+
+                // 2. Находим активный экземпляр пайплайна на этой камере
+                const fx = cam.getPostPipeline(GlitchPipeline);
+
+                if (fx) {
+                    fx.intensity = 1.0; // Врубаем на полную
+
+                    // 3. Плавно гасим
+                    this.tweens.add({
+                        targets: fx,
+                        intensity: 0,
+                        duration: 600,
+                        ease: 'Sine.easeIn',
+                        onComplete: () => {
+const fx = cam.getPostPipeline(GlitchPipeline) || cam.setPostPipeline(GlitchPipeline);
+fx.intensity = 1.0; // Принудительный сброс на максимум перед каждым запуском
+                        }
+                    });
+                }
             });
         }
     }
-    
+
     flashTerminalConfirm(callback) {
         // Просто быстрый визуальный отклик рамки
         this.cmdBg.setStrokeStyle(2, 0xffffff);
@@ -189,4 +207,66 @@ class UIScene extends Phaser.Scene {
         this.memoryText.setColor(mem > max * 0.75 ? '#ff4444' : '#00ffcc');
         this.attentionText.setText(`ATTENTION: ${att}%`);
     }
+
+
+
+    triggerOverload(duration = 3000) {
+        this.registry.set('isOverloaded', true);
+
+        // Эффект на камеры обеих сцен
+        const scenes = [this, this.scene.get('EchoScene')];
+
+        // 1. Тряска камер
+        scenes.forEach(s => s.cameras.main.shake(duration, 0.01));
+
+        // 2. Артефакты в интерфейсе
+        const glitchInterval = this.time.addEvent({
+            delay: 50,
+            callback: () => this.createInterfaceGlitch(),
+            repeat: duration / 50
+        });
+
+        // 3. Инверсия цветов и RGB Shift (через эффекты камеры)
+        this.cameras.main.setFlash(duration, 0xffffff);
+
+        this.time.delayedCall(duration, () => {
+            this.registry.set('isOverloaded', false);
+            this.resetUI(); // Возвращаем всё в норму
+        });
+    }
+
+    createInterfaceGlitch() {
+        // Случайное искажение текста памяти
+        const originalMemoryText = `MEMORY: ${this.registry.get('memory')}/${this.registry.get('maxMemory')}`;
+        const chars = '01X#@%&?';
+
+        if (Math.random() > 0.7) {
+            this.memoryText.setText(originalMemoryText.split('').map(char =>
+                Math.random() > 0.8 ? chars[Math.floor(Math.random() * chars.length)] : char
+            ).join(''));
+            this.memoryText.setX(30 + Math.random() * 10 - 5);
+            this.memoryText.setColor(Math.random() > 0.5 ? '#ff0000' : '#00ffff');
+        }
+
+        // Появление случайных "битых пикселей" на экране интерфейса
+        let block = this.add.rectangle(
+            Math.random() * this.scale.width,
+            Math.random() * this.scale.height,
+            Math.random() * 100,
+            Math.random() * 2,
+            0xffffff,
+            Math.random()
+        );
+
+        this.time.delayedCall(50, () => block.destroy());
+    }
+
+    resetUI() {
+        this.memoryText.setX(30);
+        this.memoryText.setColor('#00ffcc');
+        this.updateUI(); // Возврат нормального текста
+    }
+
+
+
 }

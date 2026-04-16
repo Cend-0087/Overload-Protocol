@@ -157,6 +157,26 @@ class EchoScene extends Phaser.Scene {
                 this.lastPulseTime = now;
             }
         }
+
+        if (this.registry.get('isOverloaded')) {
+            this.cameras.main.setLerp(0.5, 0.5); // Камера начинает "плавать"
+            
+            if (Phaser.Math.Between(0, 100) > 90) {
+                // Создаем кратковременный "фантомный" кадр
+                const flash = this.add.image(this.player.x, this.player.y, null); 
+                // Или просто рисуем случайный примитив на весь экран
+                const rect = this.add.rectangle(
+                    this.cameras.main.worldView.x + Math.random() * 1280,
+                    this.cameras.main.worldView.y + Math.random() * 720,
+                    Math.random() * 400,
+                    1,
+                    0x00ffff,
+                    0.5
+                );
+                this.time.delayedCall(30, () => rect.destroy());
+            }
+        }
+
     }
 
     // ====================== LIDAR ======================
