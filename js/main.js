@@ -23,7 +23,7 @@ const game = new Phaser.Game(config);
 
 // Глобальные данные
 game.registry.set('memory', 0);
-game.registry.set('maxMemory', 45);
+game.registry.set('maxMemory', 128);
 game.registry.set('attention', 0);
 game.registry.set('pulseCount', 0);
 
