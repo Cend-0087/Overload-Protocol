@@ -1,57 +1,82 @@
 class UIScene extends Phaser.Scene {
     constructor() {
         super({ key: 'UIScene', active: true });
+        this.isInputActive = false;
+        this.commandLine = null;
+        this.interfaceElements = null;
+        this.glitchCounter = 0;
+        this.simpleGlitch = null;
     }
 
     create() {
-        // 1. Сначала инициализируем переменные состояний
-        this.isInputActive = false;
+        console.log('[UIScene] create()');
 
-        // 2. Создаем камеры (основную и консольную)
-        this.consoleCamera = this.cameras.add();
-        this.cameras.main.setBackgroundColor('#1a1a1a');
+        // Создаем эффект
+        this.simpleGlitch = new SimpleGlitchEffect(this);
 
-        // 3. Создаем элементы правой панели
-        this.uiElements = this.add.container(0, 0);
-        const title = this.add.text(30, 40, 'SYSTEM INTERFACE', { fontSize: '24px', color: '#ffcc00', fontFamily: 'Courier New' }).setShadow(0, 0, '#ffff00', 3);
-        this.memoryText = this.add.text(30, 120, 'MEMORY: 0/45', { fontSize: '20px', color: '#00ffcc', fontFamily: 'Courier New' });
-        this.attentionText = this.add.text(30, 170, 'ATTENTION: 0%', { fontSize: '18px', color: '#ff6666', fontFamily: 'Courier New' });
-        this.uiElements.add([title, this.memoryText, this.attentionText]);
+        this.setupCameras();
+        this.createUIElements();
+        this.commandLine = new CommandLine(this, this.consoleCamera);
+        this.commandLine.create();
 
-        // 4. Создаем консоль
-        this.commandLineContainer = this.add.container(0, 0);
-        this.cmdBg = this.add.rectangle(0, 0, 100, 40, 0x000000, 0.9).setOrigin(0, 1).setStrokeStyle(1, 0x333333).setInteractive();
-        this.prefix = this.add.text(10, -30, '> ', { fontSize: '18px', color: '#00ffcc', fontFamily: 'Courier New' });
-        this.inputText = this.add.text(35, -30, '', { fontSize: '18px', color: '#ffffff', fontFamily: 'Courier New' });
-        this.cursorRect = this.add.rectangle(35, -20, 10, 2, 0x00ffcc).setOrigin(0, 0).setAlpha(0);
-        this.placeholder = this.add.text(35, -30, 'CLICK TO TYPE OR PRESS [/]', { fontSize: '14px', color: '#444444', fontFamily: 'Courier New' });
-
-        this.commandLineContainer.add([this.cmdBg, this.prefix, this.inputText, this.cursorRect, this.placeholder]);
-
-        // 5. Игнорирование камер (чтобы не двоилось)
-        this.cameras.main.ignore(this.commandLineContainer);
+        this.cameras.main.ignore(this.commandLine.container);
         this.consoleCamera.ignore(this.uiElements);
 
-        // 6. Только ТЕПЕРЬ вызываем обновление вьюпортов и вешаем ресайз
+        this.setupEventHandlers();
         this.updateViewports();
         this.scale.on('resize', this.updateViewports, this);
+        this.startUIUpdates();
 
-        // ... остальной код (tweens, input.on('pointerdown'), keyboard.on) остается без изменений ...
+        // Для отладки
+        window.killGlitch = () => {
+            if (this.simpleGlitch) this.simpleGlitch.destroy();
+        };
 
-        this.cursorTween = this.tweens.add({ targets: this.cursorRect, alpha: 1, duration: 500, yoyo: true, loop: -1, paused: true });
+        console.log('[UIScene] Инициализация завершена');
+    }
 
+    setupCameras() {
+        this.consoleCamera = this.cameras.add();
+        this.cameras.main.setBackgroundColor('#1a1a1a');
+        console.log('[UIScene] Камеры настроены: main и consoleCamera');
+    }
+
+    createUIElements() {
+        // Только элементы правой панели, без командной строки!
+        this.uiElements = this.add.container(0, 0);
+
+        const title = this.add.text(30, 40, 'SYSTEM INTERFACE', {
+            fontSize: '24px', color: '#ffcc00', fontFamily: 'Courier New'
+        }).setShadow(0, 0, '#ffff00', 3);
+
+        this.memoryText = this.add.text(30, 120, 'MEMORY: 0/45', {
+            fontSize: '20px', color: '#00ffcc', fontFamily: 'Courier New'
+        });
+
+        this.attentionText = this.add.text(30, 170, 'ATTENTION: 0%', {
+            fontSize: '18px', color: '#ff6666', fontFamily: 'Courier New'
+        });
+
+        this.uiElements.add([title, this.memoryText, this.attentionText]);
+
+        console.log('[UIScene] UI элементы созданы (память и внимание)');
+    }
+
+    setupEventHandlers() {
+        // Обработка клика для активации командной строки
         this.input.on('pointerdown', (pointer) => {
+            if (!this.commandLine) return;
+
             const worldPoint = this.consoleCamera.getWorldPoint(pointer.x, pointer.y);
-            if (this.cmdBg.getBounds().contains(worldPoint.x, worldPoint.y)) {
+            if (this.commandLine.cmdBg.getBounds().contains(worldPoint.x, worldPoint.y)) {
                 this.activateInput();
             } else {
                 this.deactivateInput();
             }
         });
 
+        // Обработка клавиатуры
         this.input.keyboard.on('keydown', (event) => {
-            // Проверяем физический код клавиши (Slash — это кнопка рядом с правым Shift)
-            // Либо оставляем проверку на символ "/", если вдруг кто-то сменил раскладку программно
             if ((event.code === 'Slash' || event.key === '/') && !this.isInputActive) {
                 event.preventDefault();
                 this.activateInput();
@@ -60,187 +85,303 @@ class UIScene extends Phaser.Scene {
             }
         });
 
-        this.time.addEvent({ delay: 150, callback: this.updateUI, callbackScope: this, loop: true });
+        console.log('[UIScene] Обработчики событий настроены');
     }
 
     activateInput() {
+        if (!this.commandLine) return;
+
         this.isInputActive = true;
-        this.placeholder.setVisible(false);
-        this.cursorTween.resume();
-        this.cursorRect.setAlpha(1);
-        this.cmdBg.setStrokeStyle(1, 0x00ffcc);
-        this.scene.get('EchoScene').input.keyboard.enabled = false;
+        this.commandLine.activate();
+
+        const echoScene = this.scene.get('EchoScene');
+        if (echoScene && echoScene.input && echoScene.input.keyboard) {
+            echoScene.input.keyboard.enabled = false;
+        }
+
+        console.log('[UIScene] Командная строка активирована');
     }
 
     deactivateInput() {
+        if (!this.commandLine) return;
+
         this.isInputActive = false;
-        this.placeholder.setVisible(this.inputText.text.length === 0);
-        this.cursorTween.pause();
-        this.cursorRect.setAlpha(0);
-        // this.cmdBg.setStrokeStyle(1, 0x333333);
-        this.scene.get('EchoScene').input.keyboard.enabled = true;
+        this.commandLine.deactivate();
+
+        const echoScene = this.scene.get('EchoScene');
+        if (echoScene && echoScene.input && echoScene.input.keyboard) {
+            echoScene.input.keyboard.enabled = true;
+        }
+
+        console.log('[UIScene] Командная строка деактивирована');
     }
 
     handleTyping(event) {
-        if (!this.isInputActive) return;
+        if (!this.isInputActive || !this.commandLine) return;
 
-        // 1. Если нажат Enter
         if (event.key === 'Enter') {
-            const command = this.inputText.text;
-            this.isInputActive = false; // Блокируем ввод на время анимации
+            const command = this.commandLine.getText();
+            console.log(`[UIScene] Введена команда: "${command}"`);
+
+            this.isInputActive = false;
 
             this.flashTerminalConfirm(() => {
                 this.executeCommand(command);
 
-                // Очищаем текст и возвращаем курсор в начало через небольшую паузу
-                // чтобы игрок успел увидеть результат (красный/бирюзовый цвет)
                 this.time.delayedCall(400, () => {
-                    this.inputText.setText('');
-                    this.inputText.setColor('#ffffff'); // Возвращаем белый для следующего ввода
-                    this.cursorRect.setX(35);
+                    this.commandLine.clear();
+                    this.commandLine.setColor('#ffffff');
                     this.deactivateInput();
                 });
             });
             return;
         }
 
-        // 2. Если нажат Backspace
         if (event.key === 'Backspace') {
-            this.inputText.setText(this.inputText.text.slice(0, -1));
-        }
-        // 3. Если нажат Escape
-        else if (event.key === 'Escape') {
+            const currentText = this.commandLine.getText();
+            this.commandLine.setText(currentText.slice(0, -1));
+        } else if (event.key === 'Escape') {
             this.deactivateInput();
-        }
-        // 4. Печать символа (проверяем, что это один символ и не служебная клавиша)
-        else if (event.key.length === 1 && event.code !== 'Slash') {
-            // Принудительно ставим белый цвет, если до этого была ошибка (красный)
-            if (this.inputText.color === '#ff4444') {
-                this.inputText.setColor('#ffffff');
+        } else if (event.key.length === 1 && event.code !== 'Slash') {
+            if (this.commandLine.inputText.color === '#ff4444') {
+                this.commandLine.setColor('#ffffff');
             }
-            this.inputText.setText(this.inputText.text + event.key);
+            this.commandLine.setText(this.commandLine.getText() + event.key);
         }
 
-        // ВАЖНО: Обновляем положение курсора ВСЕГДА в конце метода
-        this.cursorRect.setX(this.inputText.x + this.inputText.width + 2);
+        this.commandLine.updateCursorPosition();
     }
 
     executeCommand(cmd) {
         cmd = cmd.toLowerCase().trim();
+        console.log(`[UIScene] Команда: "${cmd}"`);
+
         if (cmd === '') return;
 
         if (cmd === 'clear') {
+            console.log('[UIScene] CLEAR - очистка всего');
             this.registry.set('memory', 0);
             this.events.emit('command-clear');
-            this.inputText.setColor('#00ffcc');
+            this.commandLine.setColor('#00ffcc');
+            this.flashSuccess();
+
+            // ПОЛНОСТЬЮ уничтожаем эффект если он активен
+            if (this.simpleGlitch) {
+                this.simpleGlitch.destroy();
+            }
         } else {
-            this.inputText.setColor('#ff4444');
+            console.log(`[UIScene] Ошибка: "${cmd}"`);
+            this.commandLine.setColor('#ff4444');
 
-            // Берем все камеры
-            const cams = [this.cameras.main, this.consoleCamera, this.scene.get('EchoScene').cameras.main];
+            // Пересоздаем эффект (на случай если он в странном состоянии)
+            if (this.simpleGlitch) {
+                this.simpleGlitch.destroy();
+                this.simpleGlitch = new SimpleGlitchEffect(this);
+            }
 
-            cams.forEach(cam => {
-                // 1. Добавляем пайплайн (если его еще нет)
+            // Запускаем эффект
+            this.simpleGlitch.start(600);
+        }
+    }
+
+    triggerGlitchEffect() {
+        console.log(`[UIScene] === НАЧАЛО ГЛИТЧ ЭФФЕКТА #${++this.glitchCounter} ===`);
+
+        // Временно отключаем все пост-эффекты
+        const cams = [this.cameras.main, this.consoleCamera];
+        const echoScene = this.scene.get('EchoScene');
+        if (echoScene && echoScene.cameras && echoScene.cameras.main) {
+            cams.push(echoScene.cameras.main);
+        }
+
+        cams.forEach((cam, index) => {
+            if (!cam) return;
+
+            // Полностью очищаем все пайплайны с камеры
+            console.log(`[UIScene] Камера ${index}: очищаем все пайплайны`);
+            const pipelines = cam.postPipelines;
+            if (pipelines) {
+                pipelines.forEach(pipeline => {
+                    if (pipeline && pipeline.name) {
+                        console.log(`[UIScene] Камера ${index}: удаляем пайплайн ${pipeline.name}`);
+                        cam.removePostPipeline(pipeline.name);
+                    }
+                });
+            }
+
+            // Создаем новый пайплайн с задержкой
+            this.time.delayedCall(50, () => {
+                console.log(`[UIScene] Камера ${index}: создаем новый пайплайн GlitchPipeline`);
                 cam.setPostPipeline(GlitchPipeline);
-
-                // 2. Находим активный экземпляр пайплайна на этой камере
                 const fx = cam.getPostPipeline(GlitchPipeline);
 
                 if (fx) {
-                    fx.intensity = 1.0; // Врубаем на полную
+                    fx.intensity = 1.0;
+                    console.log(`[UIScene] Камера ${index}: интенсивность = ${fx.intensity}`);
 
-                    // 3. Плавно гасим
                     this.tweens.add({
                         targets: fx,
                         intensity: 0,
                         duration: 600,
-                        ease: 'Sine.easeIn',
+                        ease: 'Sine.easeOut',
                         onComplete: () => {
-const fx = cam.getPostPipeline(GlitchPipeline) || cam.setPostPipeline(GlitchPipeline);
-fx.intensity = 1.0; // Принудительный сброс на максимум перед каждым запуском
+                            console.log(`[UIScene] Камера ${index}: эффект завершен`);
+                            // Опционально: удаляем пайплайн после завершения
+                            // cam.removePostPipeline(GlitchPipeline);
                         }
                     });
                 }
             });
-        }
+        });
     }
 
-    flashTerminalConfirm(callback) {
-        // Просто быстрый визуальный отклик рамки
-        this.cmdBg.setStrokeStyle(2, 0xffffff);
+    flashSuccess() {
+        this.commandLine.cmdBg.setStrokeStyle(2, 0x00ffcc);
         this.tweens.add({
-            targets: this.cmdBg,
+            targets: this.commandLine.cmdBg,
+            alpha: 0.7,
+            duration: 100,
+            yoyo: true,
+            onComplete: () => {
+                if (this.commandLine && this.commandLine.cmdBg) {
+                    this.commandLine.cmdBg.setStrokeStyle(1, 0x333333);
+                    this.commandLine.cmdBg.setAlpha(0.9);
+                }
+            }
+        });
+    }
+
+    cleanupEffects() {
+        console.log('[UIScene] Очистка всех эффектов');
+
+        // Останавливаем глитч эффект
+        if (this.simpleGlitch) {
+            this.simpleGlitch.forceStop();
+        }
+
+        // Сбрасываем все камеры
+        const cameras = [this.cameras.main, this.consoleCamera];
+        const echoScene = this.scene.get('EchoScene');
+        if (echoScene && echoScene.cameras && echoScene.cameras.main) {
+            cameras.push(echoScene.cameras.main);
+        }
+
+        cameras.forEach(cam => {
+            if (cam) {
+                cam.stopShake();
+                cam.clearFlash();
+
+                const fx = cam.getPostPipeline(GlitchPipeline);
+                if (fx) {
+                    fx.intensity = 0;
+                }
+            }
+        });
+    }
+
+
+    flashTerminalConfirm(callback) {
+        if (!this.commandLine) {
+            callback();
+            return;
+        }
+
+        this.commandLine.cmdBg.setStrokeStyle(2, 0xffffff);
+        this.tweens.add({
+            targets: this.commandLine.cmdBg,
             alpha: 0.5,
             duration: 60,
             yoyo: true,
             onComplete: () => {
-                this.cmdBg.setStrokeStyle(1, 0x333333);
-                this.cmdBg.setAlpha(0.9);
+                if (this.commandLine && this.commandLine.cmdBg) {
+                    this.commandLine.cmdBg.setStrokeStyle(1, 0x333333);
+                    this.commandLine.cmdBg.setAlpha(0.9);
+                }
                 callback();
             }
         });
     }
 
-    updateViewports() {
-        const totalWidth = this.scale.width;
-        const totalHeight = this.scale.height;
-        const uiWidth = this.registry.get('uiWidth');
-        const echoWidth = totalWidth - uiWidth;
+updateViewports() {
+    const totalWidth = this.scale.width;
+    const totalHeight = this.scale.height;
+    const uiWidth = this.registry.get('uiWidth');
+    const echoWidth = Math.max(totalWidth - uiWidth, 400);
+    
+    // Правая камера (UI) - от echoWidth до конца экрана
+    if (this.cameras.main) {
+        this.cameras.main.setViewport(echoWidth, 0, uiWidth, totalHeight);
+    }
+    
+    // Левая камера (консоль/игра) - от 0 до echoWidth
+    if (this.consoleCamera) {
+        this.consoleCamera.setViewport(0, 0, echoWidth, totalHeight);
+    }
+    
+    // Позиционируем командную строку
+    if (this.commandLine) {
+        this.commandLine.setPosition(0, totalHeight);
+        this.commandLine.setSize(echoWidth, 40);
+    }
+}
 
-        // Безопасная проверка: выполняем позиционирование только если объекты уже созданы
-        if (this.cameras.main) {
-            this.cameras.main.setViewport(echoWidth, 0, uiWidth, totalHeight);
-        }
-
-        if (this.consoleCamera && this.commandLineContainer) {
-            this.consoleCamera.setViewport(0, 0, echoWidth, totalHeight);
-            this.commandLineContainer.setPosition(0, totalHeight);
-            this.cmdBg.setSize(echoWidth, 40);
-        }
+    startUIUpdates() {
+        this.time.addEvent({
+            delay: 150,
+            callback: this.updateUI,
+            callbackScope: this,
+            loop: true
+        });
     }
 
     updateUI() {
         const mem = this.registry.get('memory');
         const max = this.registry.get('maxMemory');
         const att = this.registry.get('attention');
+
         this.memoryText.setText(`MEMORY: ${mem}/${max}`);
         this.memoryText.setColor(mem > max * 0.75 ? '#ff4444' : '#00ffcc');
         this.attentionText.setText(`ATTENTION: ${att}%`);
     }
 
-
-
     triggerOverload(duration = 3000) {
+        console.log('[UIScene] Триггер перегрузки системы');
+
         this.registry.set('isOverloaded', true);
 
-        // Эффект на камеры обеих сцен
         const scenes = [this, this.scene.get('EchoScene')];
+        scenes.forEach(s => {
+            if (s && s.cameras && s.cameras.main) {
+                s.cameras.main.shake(duration, 0.01);
+            }
+        });
 
-        // 1. Тряска камер
-        scenes.forEach(s => s.cameras.main.shake(duration, 0.01));
-
-        // 2. Артефакты в интерфейсе
         const glitchInterval = this.time.addEvent({
             delay: 50,
             callback: () => this.createInterfaceGlitch(),
             repeat: duration / 50
         });
 
-        // 3. Инверсия цветов и RGB Shift (через эффекты камеры)
         this.cameras.main.setFlash(duration, 0xffffff);
 
         this.time.delayedCall(duration, () => {
             this.registry.set('isOverloaded', false);
-            this.resetUI(); // Возвращаем всё в норму
+            this.resetUI();
+            console.log('[UIScene] Перегрузка завершена');
         });
     }
 
-    createInterfaceGlitch() {
-        // Случайное искажение текста памяти
-        const originalMemoryText = `MEMORY: ${this.registry.get('memory')}/${this.registry.get('maxMemory')}`;
-        const chars = '01X#@%&?';
+    testGlitch() {
+        console.log('[UIScene] РУЧНОЙ ВЫЗОВ ГЛИТЧА');
+        this.glitchCounter++;
+        this.triggerGlitchEffect();
+    }
 
+    createInterfaceGlitch() {
         if (Math.random() > 0.7) {
+            const originalMemoryText = `MEMORY: ${this.registry.get('memory')}/${this.registry.get('maxMemory')}`;
+            const chars = '01X#@%&?';
+
             this.memoryText.setText(originalMemoryText.split('').map(char =>
                 Math.random() > 0.8 ? chars[Math.floor(Math.random() * chars.length)] : char
             ).join(''));
@@ -248,7 +389,6 @@ fx.intensity = 1.0; // Принудительный сброс на максим
             this.memoryText.setColor(Math.random() > 0.5 ? '#ff0000' : '#00ffff');
         }
 
-        // Появление случайных "битых пикселей" на экране интерфейса
         let block = this.add.rectangle(
             Math.random() * this.scale.width,
             Math.random() * this.scale.height,
@@ -264,9 +404,6 @@ fx.intensity = 1.0; // Принудительный сброс на максим
     resetUI() {
         this.memoryText.setX(30);
         this.memoryText.setColor('#00ffcc');
-        this.updateUI(); // Возврат нормального текста
+        this.updateUI();
     }
-
-
-
 }

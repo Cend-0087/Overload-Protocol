@@ -10,8 +10,8 @@
             padding: 0;
             background: #000;
             overflow: hidden;
-            height: 100vh;           /* ← важно */
-            display: flex;           /* ← важно */
+            height: 100vh;
+            display: flex;
             align-items: center;
             justify-content: center;
             font-family: 'Courier New', monospace;
@@ -19,8 +19,8 @@
         
         #game {
             display: block;
-            width: 100%;             /* ← теперь занимает всё окно */
-            height: 100vh;           /* ← теперь занимает всё окно */
+            width: 100%;
+            height: 100vh;
             max-width: 100%;
             max-height: 100%;
         }
@@ -32,9 +32,35 @@
     <!-- Phaser -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.2/dist/phaser.min.js"></script>
 
-    <!-- Сначала загружаем все сцены, потом main.js -->
+    <!-- Core системы -->
+    <script src="js/core/Player.js"></script>
+    <script src="js/core/LidarSystem.js"></script>
+    <script src="js/core/MemorySystem.js"></script>
+    <script src="js/core/AttentionSystem.js"></script>
+    <script src="js/core/InputManager.js"></script>
+    
+    <!-- Мир -->
+    <script src="js/world/WallManager.js"></script>
+    
+    <!-- Сцены -->
     <script src="js/scenes/EchoScene.js"></script>
     <script src="js/scenes/UIScene.js"></script>
+    
+    <!-- UI компоненты -->
+    <script src="js/ui/CommandLine.js"></script>
+    <script src="js/ui/InterfaceElements.js"></script>
+    
+    <!-- Менеджеры -->
+    <script src="js/managers/MusicManager.js"></script>
+    
+    <!-- Эффекты -->
+    <script src="js/effects/GlitchPipeline.js"></script>
+    <script src="js/effects/SimpleGlitchEffect.js"></script>
+    
+    <!-- Утилиты -->
+    <script src="js/utils/helpers.js"></script>
+    
+    <!-- Главный файл -->
     <script src="js/main.js"></script>
 </body>
 </html>
