@@ -5,7 +5,7 @@ class MemorySystem {
     
     init() {
         this.registry.set('memory', 0);
-        this.registry.set('maxMemory', 128);
+        this.registry.set('maxMemory', 512);
     }
     
     add(amount) {

@@ -3,7 +3,7 @@ class EchoScene extends Phaser.Scene {
         super({ key: 'EchoScene', active: true });
 
         this.gameConfig = {
-            playerSpeed: 180,
+            playerSpeed: 780,
             rayCount: 20,
             maxRayCount: 1000,
             maxDistance: 520,

@@ -22,12 +22,44 @@ class WallManager {
     }
     
     static getDefaultWalls() {
-        return [
-            { x: 700, y: 300, width: 20,  height: 400, color: 0x444444 },
-            { x: 400, y: 100, width: 300, height: 20,  color: 0x444444 },
-            { x: 950, y: 500, width: 20,  height: 300, color: 0x444444 },
-            { x: 1500, y: 800, width: 400, height: 40, color: 0x444444 },
-            { x: 2000, y: 200, width: 50, height: 600, color: 0x444444 }
+        return [ 
+            // Последовательность структур по часовой стрелке начиная сверху.
+            
+            // Стены не входящие в структуры:
+
+            // Верхняя часть
+            { x: 2000, y: 160, width: 1600, height: 20,  color: 0x444444 },
+            { x: 2700, y: 600, width: 20,  height: 1000, color: 0x444444 },
+            { x: 1550, y: 330, width: 20,  height: 420, color: 0x444444 },
+            { x: 2400, y: 330, width: 20,  height: 420, color: 0x444444 },
+            { x: 2470, y: 530, width: 150, height: 20,  color: 0x444444 },
+
+            { x: 400, y: 100, width: 700, height: 20,  color: 0x444444 },
+            { x: 400, y: 450, width: 600, height: 20,  color: 0x444444 },
+            { x: 40, y: 600, width: 20,  height: 1000, color: 0x444444 },
+            { x: 600, y: 690, width: 800, height: 20, color: 0x444444 },
+
+            // Нижняя часть
+            { x: 700, y: 1000+5, width: 20,  height: 640, color: 0x444444 },
+            { x: 1350, y: 1000+5, width: 20,  height: 640, color: 0x444444 },
+            { x: 1400, y: 1100, width: 2800, height: 20, color: 0x444444 }, // Нижняя длинная стена
+            { x: 1300, y: 690, width: 300, height: 20, color: 0x444444 },
+            { x: 2100, y: 690, width: 850, height: 20, color: 0x444444 },
+
+
+            // СТРУКТУРЫ
+            // малая комната:
+            { x: 825, y: 160, width: 230, height: 20,  color: 0x444444 },
+            { x: 950, y: 330, width: 20,  height: 420, color: 0x444444 },
+            { x: 870, y: 450, width: 150, height: 20,  color: 0x444444 },
+            { x: 700, y: 300, width: 20,  height: 480, color: 0x444444 },
+
+
+            // малая комната 2:
+            { x: 825+250, y: 160, width: 230, height: 20,  color: 0x444444 },
+            { x: 950+250, y: 330, width: 20,  height: 420, color: 0x444444 },
+            { x: 870+250, y: 450, width: 150, height: 20,  color: 0x444444 },
+            { x: 700+250, y: 300, width: 20,  height: 480, color: 0x444444 },
         ];
     }
 }
