@@ -3,7 +3,7 @@ class EchoScene extends Phaser.Scene {
         super({ key: 'EchoScene', active: true });
 
         this.gameConfig = {
-            playerSpeed: 180,
+            playerSpeed: 480,
             rayCount: 20,
             maxRayCount: 1000,
             maxDistance: 520,
@@ -66,6 +66,14 @@ class EchoScene extends Phaser.Scene {
 
         // Группа точек памяти
         this.memoryPoints = this.add.group();
+
+        // === ПРЕДМЕТЫ ===
+        this.items = [];
+        this.nearItem = null; // предмет рядом с игроком
+
+        // Создаем тестовый предмет
+        const testItem = new PickupItem(this, 600, 500);
+        this.items.push(testItem);
 
         // Подписка на события
         const uiScene = this.scene.get('UIScene');
@@ -203,11 +211,58 @@ class EchoScene extends Phaser.Scene {
             this.lidarSystem.emitPulse(pos.x, pos.y, this.walls, this.memoryPoints, this.registry);
         }
 
-        // Обновление InputManager (для будущих проверок)
         this.inputManager.update(this.player);
 
-        // Подсказка взаимодействия (пока всегда скрыта — включим позже)
-        // this.inputManager.showInteractionHint(false);
+        // === ПРОВЕРКА ПРЕДМЕТОВ ===
+        this.checkNearbyItems();
+
+        // Проверяем нажатие E
+        if (this.inputManager.justPressedE() && this.nearItem) {
+            this.pickupItem(this.nearItem);
+        }
+    }
+
+    // Проверка предметов рядом
+    checkNearbyItems() {
+        if (!this.player) return;
+
+        const playerPos = this.player.getPosition();
+        let found = null;
+
+        // Ищем предмет рядом
+        for (let item of this.items) {
+            if (item.canInteract(playerPos.x, playerPos.y)) {
+                found = item;
+                break;
+            }
+        }
+
+        this.nearItem = found;
+
+        // Показываем/скрываем подсказку
+        if (this.nearItem) {
+            this.inputManager.showInteractionHint(true, playerPos.x, playerPos.y - 30);
+        } else {
+            this.inputManager.showInteractionHint(false);
+        }
+    }
+
+    // Подобрать предмет
+    pickupItem(item) {
+        if (item.pickup()) {
+            // Удаляем из массива
+            const index = this.items.indexOf(item);
+            if (index !== -1) this.items.splice(index, 1);
+
+            // Даем награду (опционально)
+            const currentMemory = this.registry.get('memory') || 0;
+            this.registry.set('memory', currentMemory + 5);
+
+            console.log('Предмет подобран! Осталось:', this.items.length);
+
+            this.nearItem = null;
+            this.inputManager.showInteractionHint(false);
+        }
     }
 
     onResize() {

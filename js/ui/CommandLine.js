@@ -1,97 +1,488 @@
 class CommandLine {
-    constructor(scene, consoleCamera) {
+    constructor(scene) {
         this.scene = scene;
-        this.consoleCamera = consoleCamera;
         this.isInputActive = false;
         this.container = null;
-        this.cmdBg = null;  // Сделано публичным
-        this.inputText = null;
+        
+        // Элементы терминала
+        this.terminalBg = null;
+        this.terminalHeader = null;
+        this.terminalContent = null;
+        this.historyLines = [];
+        this.currentInput = null;
         this.cursorRect = null;
-        this.placeholder = null;
-        this.prefix = null;
-        this.cursorTween = null;
+        
+        // Размеры
+        this.minHeight = 0.12;
+        this.maxHeight = 0.25;
+        this.currentHeight = 0.18;
+        
+        // История команд (для стрелок)
+        this.commandHistory = [];
+        this.historyIndex = -1;
+        
+        // Resize
+        this.resizeHandle = null;
+        this.isDragging = false;
     }
+
     
     create() {
+        const totalWidth = this.scene.scale.width;
+        const totalHeight = this.scene.scale.height;
+        const echoWidth = this.getEchoWidth();
+        const terminalHeight = totalHeight * this.currentHeight;
+        
         this.container = this.scene.add.container(0, 0);
+        this.container.setDepth(10001);
         
-        this.cmdBg = this.scene.add.rectangle(0, 0, 100, 40, 0x000000, 0.9)
-            .setOrigin(0, 1)
-            .setStrokeStyle(1, 0x333333)
-            .setInteractive();
-        
-        this.prefix = this.scene.add.text(10, -30, '> ', { 
-            fontSize: '18px', color: '#00ffcc', fontFamily: 'Courier New' 
-        });
-        
-        this.inputText = this.scene.add.text(35, -30, '', { 
-            fontSize: '18px', color: '#ffffff', fontFamily: 'Courier New' 
-        });
-        
-        this.cursorRect = this.scene.add.rectangle(35, -20, 10, 2, 0x00ffcc)
+        // Фон терминала (позиционируем от нижнего края)
+        this.terminalBg = this.scene.add.rectangle(0, totalHeight - terminalHeight, echoWidth, terminalHeight, 0x0c0c0c, 0.95)
             .setOrigin(0, 0)
-            .setAlpha(0);
+            .setStrokeStyle(1, 0x2b2b2b);
         
-        this.placeholder = this.scene.add.text(35, -30, 'CLICK TO TYPE OR PRESS [/]', { 
-            fontSize: '14px', color: '#444444', fontFamily: 'Courier New' 
-        });
+        // Заголовок терминала
+        this.createHeader();
         
-        this.container.add([this.cmdBg, this.prefix, this.inputText, this.cursorRect, this.placeholder]);
+        // Область вывода истории
+        this.createContentArea();
         
-        this.cursorTween = this.scene.tweens.add({ 
-            targets: this.cursorRect, 
-            alpha: 1, 
-            duration: 500, 
-            yoyo: true, 
-            loop: -1, 
-            paused: true 
-        });
+        // Область ввода
+        this.createInputArea();
+        
+        // Handle для ресайза
+        this.createResizeHandle();
+        
+        this.container.add([this.terminalBg, this.terminalHeader, this.terminalContent, 
+                           this.inputContainer, this.resizeHandle]);
+        
+        // Добавляем приветственное сообщение
+        this.addWelcomeMessage();
+        
+        // Обновляем позиции
+        this.updateLayout();
         
         return this.container;
     }
     
+    createHeader() {
+        const echoWidth = this.getEchoWidth();
+        const totalHeight = this.scene.scale.height;
+        const terminalHeight = totalHeight * this.currentHeight;
+        const headerY = totalHeight - terminalHeight;
+        
+        this.terminalHeader = this.scene.add.container(0, headerY);
+        
+        // Полоса заголовка
+        const headerBg = this.scene.add.rectangle(0, 0, echoWidth, 32, 0x1e1e1e, 1)
+            .setOrigin(0, 0);
+        
+        // Иконка терминала
+        const icon = this.scene.add.text(10, 8, '>_', {
+            fontSize: '16px',
+            color: '#00ffcc',
+            fontFamily: 'Segoe UI, Courier New',
+            fontWeight: 'bold'
+        });
+        
+        // Название
+        const title = this.scene.add.text(35, 8, 'КОМАНДНАЯ СТРОКА', {
+            fontSize: '13px',
+            color: '#e0e0e0',
+            fontFamily: 'Segoe UI',
+            fontWeight: '500'
+        });
+        
+        // Кнопка закрытия (скрыта, но код оставлен на будущее)
+        const closeBtn = this.scene.add.text(echoWidth - 45, 5, '✕', {
+            fontSize: '18px',
+            color: '#cccccc',
+            fontFamily: 'Segoe UI'
+        })
+            .setInteractive({ useHandCursor: true })
+            .setVisible(false); // Скрываем кнопку
+        
+        closeBtn.on('pointerover', () => closeBtn.setColor('#ff5555'));
+        closeBtn.on('pointerout', () => closeBtn.setColor('#cccccc'));
+        closeBtn.on('pointerdown', () => this.clearHistory());
+        
+        this.terminalHeader.add([headerBg, icon, title, closeBtn]);
+    }
+    
+    createContentArea() {
+        const totalHeight = this.scene.scale.height;
+        const terminalHeight = totalHeight * this.currentHeight;
+        const headerHeight = 32;
+        const contentY = totalHeight - terminalHeight + headerHeight;
+        
+        // Контейнер для истории команд
+        this.terminalContent = this.scene.add.container(0, contentY);
+        
+        // Маска для обрезки текста
+        const contentHeight = terminalHeight - headerHeight - 36;
+        const maskGraphics = this.scene.add.graphics();
+        maskGraphics.fillStyle(0xffffff);
+        maskGraphics.fillRect(0, contentY, this.getEchoWidth(), contentHeight);
+        const mask = maskGraphics.createGeometryMask();
+        this.terminalContent.setMask(mask);
+        this.contentMask = mask;
+        this.maskGraphics = maskGraphics;
+    }
+    
+    createInputArea() {
+        const totalHeight = this.scene.scale.height;
+        const terminalHeight = totalHeight * this.currentHeight;
+        const inputHeight = 36;
+        const inputY = totalHeight - inputHeight;
+        
+        this.inputContainer = this.scene.add.container(0, inputY);
+        
+        // Фон строки ввода
+        const inputBg = this.scene.add.rectangle(0, 0, this.getEchoWidth(), inputHeight, 0x1a1a1a, 1)
+            .setOrigin(0, 0)
+            .setStrokeStyle(1, 0x2b2b2b);
+        
+        // Промпт
+        this.prompt = this.scene.add.text(10, 8, 'PS>', {
+            fontSize: '14px',
+            color: '#00ffcc',
+            fontFamily: 'Consolas, Courier New',
+            fontWeight: 'bold'
+        });
+        
+        // Поле ввода
+        this.currentInput = this.scene.add.text(55, 8, '', {
+            fontSize: '14px',
+            color: '#ffffff',
+            fontFamily: 'Consolas, Courier New'
+        });
+        
+        // Курсор
+        this.cursorRect = this.scene.add.rectangle(55, 10, 8, 16, 0x00ffcc, 1)
+            .setOrigin(0, 0);
+        
+        // Placeholder
+        this.placeholder = this.scene.add.text(55, 8, 'Введите команду...', {
+            fontSize: '14px',
+            color: '#555555',
+            fontFamily: 'Consolas, Courier New'
+        });
+        
+        this.inputContainer.add([inputBg, this.prompt, this.currentInput, this.cursorRect, this.placeholder]);
+        
+        // Анимация курсора
+        this.scene.tweens.add({
+            targets: this.cursorRect,
+            alpha: 0,
+            duration: 500,
+            yoyo: true,
+            repeat: -1,
+            paused: true
+        });
+    }
+    
+    createResizeHandle() {
+        const totalHeight = this.scene.scale.height;
+        const terminalHeight = totalHeight * this.currentHeight;
+        const echoWidth = this.getEchoWidth();
+        const handleHeight = 4; // Тонкая горизонтальная линия
+        const handleWidth = echoWidth; // На всю ширину терминала
+        
+        this.resizeHandle = this.scene.add.rectangle(echoWidth / 2, totalHeight - terminalHeight, handleWidth, handleHeight, 0x555555, 0.8)
+            .setOrigin(0.5, 0.5)
+            .setInteractive({ useHandCursor: true })
+            .setDepth(10002);
+        
+        // Обработчики ресайза
+        this.resizeHandle.on('pointerover', () => this.resizeHandle.setFillStyle(0x00ffcc));
+        this.resizeHandle.on('pointerout', () => this.resizeHandle.setFillStyle(0x555555));
+        
+        this.resizeHandle.on('pointerdown', (pointer) => {
+            this.isDragging = true;
+            this.resizeHandle.setFillStyle(0xffcc00);
+            this.scene.input.setDefaultCursor('ns-resize');
+        });
+        
+        this.scene.input.on('pointermove', (pointer) => {
+            if (!this.isDragging) return;
+            
+            const totalHeight = this.scene.scale.height;
+            const mouseY = pointer.y;
+            const newHeightPercent = (totalHeight - mouseY) / totalHeight;
+            
+            // Ограничиваем высоту от 12% до 25%
+            const clampedHeight = Phaser.Math.Clamp(newHeightPercent, this.minHeight, this.maxHeight);
+            this.currentHeight = clampedHeight;
+            
+            this.updateLayout();
+        });
+        
+        this.scene.input.on('pointerup', () => {
+            if (!this.isDragging) return;
+            
+            this.isDragging = false;
+            this.resizeHandle.setFillStyle(0x555555);
+            this.scene.input.setDefaultCursor('default');
+        });
+    }
+    
+    addWelcomeMessage() {
+        const welcomeMsg = [
+            '╔══════════════════════════════════════════════════════════╗',
+            '║  СИСТЕМНЫЙ ТЕРМИНАЛ v1.0                                 ║',
+            '║  Введите "help" для списка команд                        ║',
+            '║  Введите "clear" для очистки экрана                      ║',
+            '╚══════════════════════════════════════════════════════════╝',
+            ''
+        ];
+        
+        welcomeMsg.forEach(msg => {
+            this.addHistoryLine(msg, '#888888');
+        });
+    }
+    
+    addHistoryLine(text, color = '#cccccc', isError = false) {
+        const maxWidth = this.getEchoWidth() - 20;
+        const yPos = 10 + this.historyLines.length * 22;
+        
+        const lineText = this.scene.add.text(10, yPos, text, {
+            fontSize: '13px',
+            color: isError ? '#ff5555' : color,
+            fontFamily: 'Consolas, Courier New',
+            wordWrap: { width: maxWidth }
+        });
+        
+        this.terminalContent.add(lineText);
+        this.historyLines.push(lineText);
+        
+        // Автоскролл вниз
+        this.scrollToBottom();
+        
+        return lineText;
+    }
+    
+    scrollToBottom() {
+        const totalHeight = this.scene.scale.height;
+        const terminalHeight = totalHeight * this.currentHeight;
+        const contentHeight = this.historyLines.length * 22;
+        const visibleHeight = terminalHeight - 32 - 36;
+        
+        if (contentHeight > visibleHeight) {
+            const scrollY = contentHeight - visibleHeight;
+            this.terminalContent.setY(this.getContentY() - scrollY);
+        } else {
+            this.terminalContent.setY(this.getContentY());
+        }
+    }
+    
+    getContentY() {
+        const totalHeight = this.scene.scale.height;
+        const terminalHeight = totalHeight * this.currentHeight;
+        return totalHeight - terminalHeight + 32;
+    }
+    
+    updateLayout() {
+        const totalWidth = this.scene.scale.width;
+        const totalHeight = this.scene.scale.height;
+        const echoWidth = this.getEchoWidth();
+        const terminalHeight = totalHeight * this.currentHeight;
+        const headerHeight = 32;
+        const inputHeight = 36;
+        const contentHeight = terminalHeight - headerHeight - inputHeight;
+        const terminalY = totalHeight - terminalHeight;
+        
+        // Обновляем фон
+        this.terminalBg.setSize(echoWidth, terminalHeight);
+        this.terminalBg.setPosition(0, terminalY);
+        
+        // Обновляем заголовок
+        this.terminalHeader.setPosition(0, terminalY);
+        const headerBg = this.terminalHeader.getAt(0);
+        if (headerBg) headerBg.setSize(echoWidth, headerHeight);
+        
+        const closeBtn = this.terminalHeader.getAt(3);
+        if (closeBtn) closeBtn.setPosition(echoWidth - 45, 5);
+        
+        // Обновляем маску
+        this.maskGraphics.clear();
+        this.maskGraphics.fillStyle(0xffffff);
+        this.maskGraphics.fillRect(0, terminalY + headerHeight, echoWidth, contentHeight);
+        
+        // Обновляем контент
+        this.terminalContent.setPosition(0, terminalY + headerHeight);
+        
+        // Обновляем строку ввода
+        this.inputContainer.setPosition(0, totalHeight - inputHeight);
+        const inputBg = this.inputContainer.getAt(0);
+        if (inputBg) {
+            inputBg.setSize(echoWidth, inputHeight);
+        }
+        
+        // Обновляем ресайз хэндл (горизонтальная линия на всю ширину)
+        this.resizeHandle.setPosition(echoWidth / 2, terminalY);
+        this.resizeHandle.setSize(echoWidth, 4);
+        
+        // Обновляем позиции строк истории
+        this.updateHistoryPositions();
+    }
+    
+    updateHistoryPositions() {
+        this.historyLines.forEach((line, index) => {
+            line.setY(10 + index * 22);
+        });
+        this.scrollToBottom();
+    }
+    
+    getEchoWidth() {
+        const totalWidth = this.scene.scale.width;
+        const uiWidth = this.scene.registry.get('uiWidth') || 420;
+        return Math.max(totalWidth - uiWidth, 400);
+    }
+    
+    // Публичные методы
     activate() {
         this.isInputActive = true;
         this.placeholder.setVisible(false);
-        this.cursorTween.resume();
         this.cursorRect.setAlpha(1);
-        this.cmdBg.setStrokeStyle(1, 0x00ffcc);
+        
+        // Включаем анимацию курсора
+        const tween = this.scene.tweens.getTweensOf(this.cursorRect)[0];
+        if (tween) tween.resume();
+        
+        // Меняем цвет рамки
+        const inputBg = this.inputContainer.getAt(0);
+        inputBg.setStrokeStyle(1, 0x00ffcc);
     }
     
     deactivate() {
         this.isInputActive = false;
-        this.placeholder.setVisible(this.inputText.text.length === 0);
-        this.cursorTween.pause();
+        this.placeholder.setVisible(this.currentInput.text.length === 0);
         this.cursorRect.setAlpha(0);
-        this.cmdBg.setStrokeStyle(1, 0x333333);
+        
+        // Останавливаем анимацию курсора
+        const tween = this.scene.tweens.getTweensOf(this.cursorRect)[0];
+        if (tween) tween.pause();
+        
+        // Возвращаем цвет рамки
+        const inputBg = this.inputContainer.getAt(0);
+        inputBg.setStrokeStyle(1, 0x2b2b2b);
     }
     
     getText() {
-        return this.inputText.text;
+        return this.currentInput.text;
     }
     
     setText(text) {
-        this.inputText.setText(text);
+        this.currentInput.setText(text);
+        this.updateCursorPosition();
     }
     
     clear() {
-        this.inputText.setText('');
-        this.cursorRect.setX(35);
+        // Очищаем историю
+        this.historyLines.forEach(line => line.destroy());
+        this.historyLines = [];
+        
+        // Добавляем сообщение об очистке
+        this.addHistoryLine('> Экран очищен', '#888888');
+        
+        // Очищаем текущий ввод
+        this.currentInput.setText('');
+        this.updateCursorPosition();
+        
+        // Сбрасываем историю команд
+        this.commandHistory = [];
+        this.historyIndex = -1;
+    }
+    
+    clearHistory() {
+        this.historyLines.forEach(line => line.destroy());
+        this.historyLines = [];
+        this.addHistoryLine('> История очищена', '#888888');
     }
     
     setColor(color) {
-        this.inputText.setColor(color);
+        this.currentInput.setColor(color);
     }
     
     updateCursorPosition() {
-        this.cursorRect.setX(this.inputText.x + this.inputText.width + 2);
+        const cursorX = 55 + this.currentInput.width;
+        this.cursorRect.setX(cursorX);
     }
     
     setSize(width, height) {
-        this.cmdBg.setSize(width, 40);
+        this.updateLayout();
     }
     
     setPosition(x, y) {
         this.container.setPosition(x, y);
+    }
+    
+    addCommandToHistory(command) {
+        if (command.trim() === '') return;
+        
+        this.commandHistory.push(command);
+        this.historyIndex = this.commandHistory.length;
+    }
+    
+    navigateHistory(direction) {
+        if (this.commandHistory.length === 0) return;
+        
+        if (direction === 'up') {
+            if (this.historyIndex > 0) {
+                this.historyIndex--;
+                this.setText(this.commandHistory[this.historyIndex]);
+            }
+        } else if (direction === 'down') {
+            if (this.historyIndex < this.commandHistory.length - 1) {
+                this.historyIndex++;
+                this.setText(this.commandHistory[this.historyIndex]);
+            } else {
+                this.historyIndex = this.commandHistory.length;
+                this.setText('');
+            }
+        }
+        
+        this.updateCursorPosition();
+    }
+    
+    log(message, color = '#cccccc') {
+        if (typeof message === 'object') {
+            message = JSON.stringify(message, null, 2);
+        }
+        
+        const lines = message.split('\n');
+        lines.forEach(line => {
+            this.addHistoryLine(line, color);
+        });
+        
+        this.scrollToBottom();
+    }
+    
+    error(message) {
+        this.log(message, '#ff5555');
+    }
+    
+
+
+    success(message) {
+        this.log(message, '#00ffcc');
+    }
+    
+    setTempMessage(message, color = '#00ffcc', duration = 2000) {
+        const originalInput = this.currentInput.text;
+        const originalColor = this.currentInput.style.color;
+        
+        this.currentInput.setText(message);
+        this.currentInput.setColor(color);
+        
+        this.scene.time.delayedCall(duration, () => {
+            if (this.currentInput.text === message) {
+                this.currentInput.setText(originalInput);
+                this.currentInput.setColor(originalColor);
+                this.updateCursorPosition();
+            }
+        });
+        
+        this.updateCursorPosition();
     }
 }
