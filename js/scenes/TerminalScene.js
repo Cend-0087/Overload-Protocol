@@ -19,7 +19,7 @@ class TerminalScene extends Phaser.Scene {
         }
 
         // Создаем терминал
-        this.commandLine = new CommandLine(this, this.consoleCamera);
+        this.commandLine = new CommandLine(this);
         this.commandLine.create();
 
         // Настройка обработчиков
@@ -119,20 +119,26 @@ class TerminalScene extends Phaser.Scene {
         }
 
         if (event.key === 'Enter') {
+            event.preventDefault();
             const command = this.commandLine.getText();
             console.log(`[TerminalScene] Введена команда: "${command}"`);
 
-            this.isInputActive = false;
-
-            this.flashTerminalConfirm(() => {
+            if (command.trim() !== '') {
+                // Добавляем команду в историю
+                this.commandLine.addCommandToHistory(command);
+                // Отображаем введенную команду
+                this.commandLine.log(`> ${command}`, '#00ffcc');
+                // Выполняем команду
                 this.executeCommand(command);
+            }
 
-                this.time.delayedCall(400, () => {
-                    this.commandLine.clear();
-                    this.commandLine.setColor('#ffffff');
-                    this.deactivateInput();
-                });
-            });
+            // Очищаем строку ввода
+            this.commandLine.setText('');
+            this.commandLine.updateCursorPosition();
+            
+            // Деактивируем ввод
+            this.deactivateInput();
+            
             return;
         }
 
@@ -141,7 +147,7 @@ class TerminalScene extends Phaser.Scene {
             this.commandLine.setText(currentText.slice(0, -1));
         } else if (event.key === 'Escape') {
             this.deactivateInput();
-        } else if (event.key.length === 1 && event.code !== 'Slash') {
+        } else if (event.key.length === 1 && event.code !== 'Slash' && event.key !== 'Enter') {
             if (this.commandLine.currentInput.style.color === '#ff4444') {
                 this.commandLine.setColor('#ffffff');
             }
@@ -154,16 +160,10 @@ class TerminalScene extends Phaser.Scene {
     executeCommand(cmd) {
         cmd = cmd.toLowerCase().trim();
 
-        // Добавляем команду в историю терминала (ВАЖНО: ДО любой очистки!)
-        if (this.commandLine && cmd !== '') {
-            this.commandLine.addCommandToHistory(cmd);
-            this.commandLine.log(`> ${cmd}`, '#00ffcc');
-        }
-
         if (cmd === '') return;
 
         if (cmd === 'clear') {
-            console.log('[TerminalScene] CLEAR - очистка всего');
+            console.log('[TerminalScene] CLEAR - очистка экрана (история команд сохраняется)');
 
             // Очищаем память в реестре
             this.registry.set('memory', 0);
@@ -180,11 +180,6 @@ class TerminalScene extends Phaser.Scene {
                 console.log('[TerminalScene] Точки памяти очищены');
             }
 
-            // Очищаем терминал (только визуальный вывод)
-            if (this.commandLine) {
-                this.commandLine.clear(); // Теперь это не очищает историю команд!
-            }
-
             this.commandLine.setColor('#00ffcc');
             this.flashSuccess();
 
@@ -195,23 +190,37 @@ class TerminalScene extends Phaser.Scene {
                 uiScene.simpleGlitch = new SimpleGlitchEffect(uiScene);
             }
         }
+        else if (cmd === 'clearhistory') {
+            // Новая команда для полной очистки истории команд
+            this.commandLine.clearCommandHistory();
+            this.commandLine.success('История команд очищена');
+        }
         else if (cmd === 'help') {
-            this.commandLine.log('\nДоступные команды:', '#00ffcc');
-            this.commandLine.log('  clear  - Очистить экран и память', '#cccccc');
-            this.commandLine.log('  help   - Показать эту справку', '#cccccc');
-            this.commandLine.log('  stats  - Показать статистику системы', '#cccccc');
-            this.commandLine.log('  glitch - Запустить эффект глитча', '#cccccc');
-            this.commandLine.log('');
+            this.commandLine.log('', '#00ffcc');
+            this.commandLine.log('╔══════════════════════════════════════════════════════════╗', '#00ffcc');
+            this.commandLine.log('║  ДОСТУПНЫЕ КОМАНДЫ                                      ║', '#00ffcc');
+            this.commandLine.log('╠══════════════════════════════════════════════════════════╣', '#00ffcc');
+            this.commandLine.log('║  clear        - Очистить экран и память                  ║', '#cccccc');
+            this.commandLine.log('║  clearhistory - Очистить историю команд                  ║', '#cccccc');
+            this.commandLine.log('║  help         - Показать эту справку                     ║', '#cccccc');
+            this.commandLine.log('║  stats        - Показать статистику системы              ║', '#cccccc');
+            this.commandLine.log('║  glitch       - Запустить эффект глитча                  ║', '#cccccc');
+            this.commandLine.log('╚══════════════════════════════════════════════════════════╝', '#00ffcc');
+            this.commandLine.log('', '#00ffcc');
         } else if (cmd === 'stats') {
             const mem = this.registry.get('memory') || 0;
             const maxMem = this.registry.get('maxMemory') || 45;
             const att = this.registry.get('attention') || 0;
 
-            this.commandLine.log('\n=== СТАТИСТИКА СИСТЕМЫ ===', '#00ffcc');
-            this.commandLine.log(`Память: ${mem}/${maxMem}`, '#cccccc');
-            this.commandLine.log(`Внимание: ${att}%`, '#cccccc');
-            this.commandLine.log(`Предметов собрано: ${this.registry.get('itemsCollected') || 0}`, '#cccccc');
-            this.commandLine.log('==========================\n', '#00ffcc');
+            this.commandLine.log('', '#00ffcc');
+            this.commandLine.log('╔══════════════════════════════════════════════════════════╗', '#00ffcc');
+            this.commandLine.log('║  СТАТИСТИКА СИСТЕМЫ                                      ║', '#00ffcc');
+            this.commandLine.log('╠══════════════════════════════════════════════════════════╣', '#00ffcc');
+            this.commandLine.log(`║  ПАМЯТЬ:    ${mem.toString().padStart(3)}/${maxMem}                                  ║`, '#cccccc');
+            this.commandLine.log(`║  ВНИМАНИЕ:  ${att.toString().padStart(3)}%                                      ║`, '#cccccc');
+            this.commandLine.log(`║  ПРЕДМЕТЫ:  ${(this.registry.get('itemsCollected') || 0).toString().padStart(3)}/∞                                      ║`, '#cccccc');
+            this.commandLine.log('╚══════════════════════════════════════════════════════════╝', '#00ffcc');
+            this.commandLine.log('', '#00ffcc');
         } else if (cmd === 'glitch') {
             this.commandLine.log('Запуск глитч-эффекта...', '#ffcc00');
 
@@ -223,14 +232,12 @@ class TerminalScene extends Phaser.Scene {
                 }
                 uiScene.simpleGlitch.start(800);
             }
+            this.commandLine.success('Глитч-эффект завершен!');
         } else {
             console.log(`[TerminalScene] Ошибка: "${cmd}"`);
             this.commandLine.setColor('#ff4444');
-
-            if (this.commandLine) {
-                this.commandLine.error(`Ошибка: неизвестная команда "${cmd}"`);
-                this.commandLine.log('Введите "help" для списка доступных команд', '#888888');
-            }
+            this.commandLine.error(`Ошибка: неизвестная команда "${cmd}"`);
+            this.commandLine.log('Введите "help" для списка доступных команд', '#888888');
 
             // Глитч эффект через UIScene
             const uiScene = this.scene.get('UIScene');
@@ -265,7 +272,7 @@ class TerminalScene extends Phaser.Scene {
 
     flashTerminalConfirm(callback) {
         if (!this.commandLine || !this.commandLine.inputContainer) {
-            callback();
+            if (callback) callback();
             return;
         }
 
@@ -281,7 +288,7 @@ class TerminalScene extends Phaser.Scene {
                     inputBg.setStrokeStyle(1, 0x2b2b2b);
                     inputBg.setAlpha(1);
                 }
-                callback();
+                if (callback) callback();
             }
         });
     }

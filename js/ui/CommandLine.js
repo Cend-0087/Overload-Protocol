@@ -21,6 +21,11 @@ class CommandLine {
         this.commandHistory = [];
         this.historyIndex = -1;
         
+        // Прокрутка
+        this.userScrolledUp = false;
+        this.scrollOffset = 0;
+        this.maxScrollOffset = 0;
+        
         // Resize
         this.resizeHandle = null;
         this.isDragging = false;
@@ -62,8 +67,74 @@ class CommandLine {
         // Обновляем позиции
         this.updateLayout();
         
+        // Настраиваем прокрутку колесиком мыши
+        this.setupScrollHandler();
+        
         return this.container;
     }
+    
+setupScrollHandler() {
+    this.scene.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
+        // Получаем границы терминала
+        const terminalY = this.terminalBg.y;
+        const terminalHeight = this.terminalBg.height;
+        
+        // Проверяем, находится ли мышь над областью терминала
+        if (pointer.y >= terminalY && pointer.y <= terminalY + terminalHeight) {
+            const scrollDelta = deltaY > 0 ? 30 : -30;
+            this.scrollContent(scrollDelta);
+        }
+    });
+}
+    
+scrollContent(delta) {
+    const totalHeight = this.scene.scale.height;
+    const terminalHeight = totalHeight * this.currentHeight;
+    const visibleHeight = terminalHeight - 32 - 36;
+    const totalContentHeight = this.historyLines.length * 22;
+    
+    if (totalContentHeight <= visibleHeight) {
+        return;
+    }
+    
+    this.maxScrollOffset = totalContentHeight - visibleHeight;
+    
+    // Применяем дельту
+    let newOffset = this.scrollOffset + delta;
+    newOffset = Phaser.Math.Clamp(newOffset, 0, this.maxScrollOffset);
+    
+    // Если пользователь прокрутил вверх - запоминаем, что он не хочет автоскролл
+    if (newOffset < this.maxScrollOffset) {
+        this.userScrolledUp = true;
+    }
+    
+    // Если прокрутили до самого низа - сбрасываем флаг
+    if (newOffset >= this.maxScrollOffset) {
+        this.userScrolledUp = false;
+    }
+    
+    this.scrollOffset = newOffset;
+    
+    const contentY = this.getContentY();
+    this.terminalContent.setY(contentY - this.scrollOffset);
+}
+    
+scrollToBottom() {
+    const totalHeight = this.scene.scale.height;
+    const terminalHeight = totalHeight * this.currentHeight;
+    const visibleHeight = terminalHeight - 32 - 36;
+    const totalContentHeight = this.historyLines.length * 22;
+    
+    if (totalContentHeight > visibleHeight) {
+        this.scrollOffset = totalContentHeight - visibleHeight;
+        this.maxScrollOffset = this.scrollOffset;
+    } else {
+        this.scrollOffset = 0;
+    }
+    
+    const contentY = this.getContentY();
+    this.terminalContent.setY(contentY - this.scrollOffset);
+}
     
     createHeader() {
         const echoWidth = this.getEchoWidth();
@@ -229,7 +300,7 @@ class CommandLine {
     addWelcomeMessage() {
         const welcomeMsg = [
             '╔══════════════════════════════════════════════════════════╗',
-            '║  СИСТЕМНЫЙ ТЕРМИНАЛ v1.0                                 ║',
+            '║  СИСТЕМНЫЙ ТЕРМИНАЛ v2.0                                 ║',
             '║  Введите "help" для списка команд                        ║',
             '║  Введите "clear" для очистки экрана                      ║',
             '╚══════════════════════════════════════════════════════════╝',
@@ -241,39 +312,27 @@ class CommandLine {
         });
     }
     
-    addHistoryLine(text, color = '#cccccc', isError = false) {
-        const maxWidth = this.getEchoWidth() - 20;
-        const yPos = 10 + this.historyLines.length * 22;
-        
-        const lineText = this.scene.add.text(10, yPos, text, {
-            fontSize: '13px',
-            color: isError ? '#ff5555' : color,
-            fontFamily: 'Consolas, Courier New',
-            wordWrap: { width: maxWidth }
-        });
-        
-        this.terminalContent.add(lineText);
-        this.historyLines.push(lineText);
-        
-        // Автоскролл вниз
+addHistoryLine(text, color = '#cccccc', isError = false) {
+    const maxWidth = this.getEchoWidth() - 20;
+    const yPos = 10 + this.historyLines.length * 22;
+    
+    const lineText = this.scene.add.text(10, yPos, text, {
+        fontSize: '13px',
+        color: isError ? '#ff5555' : color,
+        fontFamily: 'Consolas, Courier New',
+        wordWrap: { width: maxWidth, useAdvancedWrap: true }
+    });
+    
+    this.terminalContent.add(lineText);
+    this.historyLines.push(lineText);
+    
+    // Прокручиваем вниз ТОЛЬКО если пользователь не прокрутил вверх
+    if (!this.userScrolledUp) {
         this.scrollToBottom();
-        
-        return lineText;
     }
     
-    scrollToBottom() {
-        const totalHeight = this.scene.scale.height;
-        const terminalHeight = totalHeight * this.currentHeight;
-        const contentHeight = this.historyLines.length * 22;
-        const visibleHeight = terminalHeight - 32 - 36;
-        
-        if (contentHeight > visibleHeight) {
-            const scrollY = contentHeight - visibleHeight;
-            this.terminalContent.setY(this.getContentY() - scrollY);
-        } else {
-            this.terminalContent.setY(this.getContentY());
-        }
-    }
+    return lineText;
+}
     
     getContentY() {
         const totalHeight = this.scene.scale.height;
@@ -324,6 +383,9 @@ class CommandLine {
         
         // Обновляем позиции строк истории
         this.updateHistoryPositions();
+        
+        // Обновляем скролл
+        this.scrollToBottom();
     }
     
     updateHistoryPositions() {
@@ -375,23 +437,37 @@ class CommandLine {
     setText(text) {
         this.currentInput.setText(text);
         this.updateCursorPosition();
+        // Обновляем видимость placeholder
+        this.placeholder.setVisible(!this.isInputActive && text.length === 0);
     }
     
+    // Очистка только вывода терминала (сохраняет историю команд)
+clearTerminal() {
+    // Уничтожаем все строки вывода
+    this.historyLines.forEach(line => line.destroy());
+    this.historyLines = [];
+    
+    // СБРАСЫВАЕМ СКРОЛЛ
+    this.scrollOffset = 0;
+    this.maxScrollOffset = 0;
+    
+    // Добавляем сообщение об очистке
+    this.addHistoryLine('> Экран очищен', '#888888');
+}
+    
+    // Полная очистка (очищает и вывод, и историю команд)
     clear() {
-        // Очищаем историю
-        this.historyLines.forEach(line => line.destroy());
-        this.historyLines = [];
+        this.clearTerminal();
         
-        // Добавляем сообщение об очистке
-        this.addHistoryLine('> Экран очищен', '#888888');
-        
-        // Очищаем текущий ввод
-        this.currentInput.setText('');
-        this.updateCursorPosition();
-        
-        // Сбрасываем историю команд
+        // Сбрасываем историю команд НО сохраняем команды для навигации
+        // Для полной очистки истории команд нужен отдельный метод
+    }
+    
+    // Очистка истории команд (сохраняет вывод)
+    clearCommandHistory() {
         this.commandHistory = [];
         this.historyIndex = -1;
+        this.log('> История команд очищена', '#888888');
     }
     
     clearHistory() {
@@ -462,8 +538,6 @@ class CommandLine {
         this.log(message, '#ff5555');
     }
     
-
-
     success(message) {
         this.log(message, '#00ffcc');
     }

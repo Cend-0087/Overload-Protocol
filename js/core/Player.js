@@ -1,21 +1,29 @@
-class Player extends Phaser.GameObjects.Container {
+class Player extends Phaser.GameObjects.Sprite {
     constructor(scene, x, y) {
-        super(scene, x, y);
-
-        // Создаем визуальный объект
-        this.circle = scene.add.circle(0, 0, 8, 0x00ffff);
-        this.add(this.circle);
-
+        // Создаем спрайт с круглой текстурой
+        super(scene, x, y, null);
+        
+        // Создаем круглую графику как текстуру
+        const graphics = scene.add.graphics();
+        graphics.fillStyle(0x00ffff, 1);
+        graphics.fillCircle(8, 8, 8);
+        graphics.generateTexture('playerCircle', 16, 16);
+        graphics.destroy();
+        
+        // Устанавливаем текстуру
+        this.setTexture('playerCircle');
+        this.setOrigin(0.5, 0.5); // Центрируем спрайт
+        
         scene.add.existing(this);
-
-        // Добавляем физику после добавления в сцену
+        
+        // Добавляем физику
         scene.physics.world.enable(this);
-
+        
         // Настройка физического тела
         this.body.setCircle(8);
         this.body.setCollideWorldBounds(true);
         this.body.setBounce(0);
-
+        
         // Сохраняем ссылку на сцену
         this.scene = scene;
     }
