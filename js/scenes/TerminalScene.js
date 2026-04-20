@@ -135,10 +135,10 @@ class TerminalScene extends Phaser.Scene {
             // Очищаем строку ввода
             this.commandLine.setText('');
             this.commandLine.updateCursorPosition();
-            
+
             // Деактивируем ввод
             this.deactivateInput();
-            
+
             return;
         }
 
@@ -233,7 +233,25 @@ class TerminalScene extends Phaser.Scene {
                 uiScene.simpleGlitch.start(800);
             }
             this.commandLine.success('Глитч-эффект завершен!');
-        } else {
+        }
+        // После обработки других команд, добавить:
+        else if (cmd === 'y' || cmd === 'yes') {
+            if (this.pendingTransition) {
+                this.confirmTransition();
+            } else {
+                this.commandLine.log('Нет ожидающих переходов', '#888888');
+            }
+        }
+        else if (cmd === 'n' || cmd === 'no') {
+            if (this.pendingTransition) {
+                this.cancelTransition();
+            } else {
+                this.commandLine.log('Нет ожидающих переходов', '#888888');
+            }
+        }
+
+
+        else {
             console.log(`[TerminalScene] Ошибка: "${cmd}"`);
             this.commandLine.setColor('#ff4444');
             this.commandLine.error(`Ошибка: неизвестная команда "${cmd}"`);
@@ -249,7 +267,54 @@ class TerminalScene extends Phaser.Scene {
                 uiScene.simpleGlitch.start(600);
             }
         }
+
+
+
+
     }
+
+    requestTransition(zone) {
+        this.pendingTransition = true;
+        this.pendingZone = zone;
+        this.commandLine.log('\n⚠️  Желаете перейти в следующую зону?', '#ffcc00');
+        this.commandLine.log('Введите: y или n', '#ffcc00');
+        this.activateInput();
+    }
+
+    confirmTransition() {
+        this.pendingTransition = false;
+        this.commandLine.log('Переход подтвержден. Запуск глитч-эффекта...', '#00ffcc');
+
+        // Запускаем глитч
+        const uiScene = this.scene.get('UIScene');
+        if (uiScene && uiScene.simpleGlitch) {
+            uiScene.simpleGlitch.destroy();
+            uiScene.simpleGlitch = new SimpleGlitchEffect(uiScene);
+            uiScene.simpleGlitch.start(1500);
+        }
+
+        // Ждем завершения глитча и переключаем уровень
+        this.time.delayedCall(1600, () => {
+            const echoScene = this.scene.get('EchoScene');
+            if (echoScene && echoScene.levelManager) {
+                const targetLevel = this.pendingZone.targetLevel;
+                echoScene.levelManager.loadLevel(targetLevel);
+                this.commandLine.success(`Переход на уровень ${targetLevel} завершен!`);
+            }
+            this.pendingZone = null;
+        });
+    }
+
+    cancelTransition() {
+        this.pendingTransition = false;
+        this.pendingZone = null;
+        this.commandLine.log('Переход отменен', '#888888');
+    }
+
+
+
+
+
 
     flashSuccess() {
         if (!this.commandLine || !this.commandLine.inputContainer) return;

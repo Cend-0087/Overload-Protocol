@@ -69,11 +69,17 @@ class EchoScene extends Phaser.Scene {
 
         // === ПРЕДМЕТЫ ===
         this.items = [];
-        this.nearItem = null; // предмет рядом с игроком
+        this.nearItem = null;
+        this.transitionZones = [];
+        this.nearTransitionZone = null;
 
-        // Создаем тестовый предмет
-        const testItem = new PickupItem(this, 600, 500);
-        this.items.push(testItem);
+        // Создаем менеджер уровней
+        this.levelManager = new LevelManager(this);
+        this.levelManager.loadLevel(1);
+
+        // Ссылка на текущую зону перехода
+        this.currentTransitionZone = null;
+        this.pendingTransition = false;
 
         // Подписка на события
         const uiScene = this.scene.get('UIScene');
@@ -102,14 +108,13 @@ class EchoScene extends Phaser.Scene {
 
         this.divider = this.add.rectangle(initialX, 0, 6, this.scale.height, 0x555555)
             .setOrigin(0.5, 0)
-            .setDepth(10000)                    // высокий depth
+            .setDepth(10000)
             .setScrollFactor(0)
             .setInteractive({
-                hitArea: new Phaser.Geom.Rectangle(-8, 0, 22, this.scale.height), // широкая зона захвата
+                hitArea: new Phaser.Geom.Rectangle(-8, 0, 22, this.scale.height),
                 useHandCursor: true
             });
 
-        // Визуальная обратная связь
         this.divider.on('pointerover', () => this.divider.setFillStyle(0x00ffcc));
         this.divider.on('pointerout', () => this.divider.setFillStyle(0x555555));
 
@@ -120,20 +125,14 @@ class EchoScene extends Phaser.Scene {
             this.divider.setFillStyle(0xffcc00);
             this.input.setDefaultCursor('col-resize');
             this.registry.set('isDraggingDivider', true);
-
-            // Блокируем управление игроком во время драга
             if (this.input.keyboard) this.input.keyboard.enabled = false;
         });
 
-        // Глобальные события
         this.input.on('pointermove', (pointer) => {
             if (!isDragging) return;
-
             const newUiWidth = this.scale.width - pointer.x;
             const clamped = Phaser.Math.Clamp(newUiWidth, 320, 520);
-
             this.registry.set('uiWidth', clamped);
-
             this.updateViewports();
             const uiScene = this.scene.get('UIScene');
             if (uiScene && uiScene.updateViewports) {
@@ -143,16 +142,13 @@ class EchoScene extends Phaser.Scene {
 
         this.input.on('pointerup', () => {
             if (!isDragging) return;
-
             isDragging = false;
             this.divider.setFillStyle(0x555555);
             this.input.setDefaultCursor('default');
             this.registry.set('isDraggingDivider', false);
-
             if (this.input.keyboard) this.input.keyboard.enabled = true;
         });
 
-        // Ресайз
         this.scale.on('resize', () => {
             this.updateViewports();
         });
@@ -168,16 +164,10 @@ class EchoScene extends Phaser.Scene {
 
     handleDividerDrag(pointer) {
         if (!this.registry.get('isDraggingDivider')) return;
-
-        // Вычисляем новую ширину UI на основе позиции мыши
         const newUiWidth = this.scale.width - pointer.x;
-        const clamped = Phaser.Math.Clamp(newUiWidth, 300, 600); // Минимум 300, максимум 600
-
+        const clamped = Phaser.Math.Clamp(newUiWidth, 300, 600);
         this.registry.set('uiWidth', clamped);
-
-        // Обновляем вьюпорты в обеих сценах
         this.updateViewports();
-
         const uiScene = this.scene.get('UIScene');
         if (uiScene && uiScene.updateViewports) {
             uiScene.updateViewports();
@@ -188,12 +178,8 @@ class EchoScene extends Phaser.Scene {
         const totalWidth = this.scale.width;
         const totalHeight = this.scale.height;
         const uiWidth = this.registry.get('uiWidth');
-        const echoWidth = Math.max(totalWidth - uiWidth, 400); // Минимум 400 для игровой области
-
-        // Обновляем вьюпорт камеры EchoScene
+        const echoWidth = Math.max(totalWidth - uiWidth, 400);
         this.cameras.main.setViewport(0, 0, echoWidth, totalHeight);
-
-        // Обновляем позицию разделителя
         if (this.divider) {
             this.divider.setPosition(echoWidth, 0);
             this.divider.setDisplaySize(6, totalHeight);
@@ -205,61 +191,77 @@ class EchoScene extends Phaser.Scene {
             this.player.update(this.inputManager.keys, this.gameConfig.playerSpeed);
         }
 
-        // Лидар-импульс
         if (Phaser.Input.Keyboard.JustDown(this.inputManager.keys.SPACE)) {
             const pos = this.player.getPosition();
             this.lidarSystem.emitPulse(pos.x, pos.y, this.walls, this.memoryPoints, this.registry);
         }
 
         this.inputManager.update(this.player);
-
-        // === ПРОВЕРКА ПРЕДМЕТОВ ===
         this.checkNearbyItems();
+        this.checkTransitionZones();
 
-        // Проверяем нажатие E
-        if (this.inputManager.justPressedE() && this.nearItem) {
-            this.pickupItem(this.nearItem);
+        if (this.inputManager.justPressedE()) {
+            this.handleInteraction();
         }
     }
 
-    // Проверка предметов рядом
     checkNearbyItems() {
         if (!this.player) return;
-
         const playerPos = this.player.getPosition();
         let found = null;
-
-        // Ищем предмет рядом
         for (let item of this.items) {
             if (item.canInteract(playerPos.x, playerPos.y)) {
                 found = item;
                 break;
             }
         }
-
         this.nearItem = found;
-
-        // Показываем/скрываем подсказку
         if (this.nearItem) {
             this.inputManager.showInteractionHint(true, playerPos.x, playerPos.y - 30);
-        } else {
+        } else if (!this.nearTransitionZone) {
             this.inputManager.showInteractionHint(false);
         }
     }
 
-    // Подобрать предмет
+    checkTransitionZones() {
+        if (!this.player || this.pendingTransition) return;
+        const playerPos = this.player.getPosition();
+        let foundZone = null;
+        if (this.transitionZones) {
+            for (let zone of this.transitionZones) {
+                if (zone.canInteract(playerPos.x, playerPos.y)) {
+                    foundZone = zone;
+                    break;
+                }
+            }
+        }
+        this.nearTransitionZone = foundZone;
+        if (this.nearTransitionZone && !this.nearItem) {
+            this.inputManager.showInteractionHint(true, playerPos.x, playerPos.y - 30);
+        }
+    }
+
+    handleInteraction() {
+        if (this.nearItem) {
+            this.pickupItem(this.nearItem);
+        } else if (this.nearTransitionZone) {
+            const terminalScene = this.scene.get('TerminalScene');
+            if (terminalScene && !terminalScene.pendingTransition) {
+                const result = this.nearTransitionZone.interact();
+                if (result.success) {
+                    terminalScene.requestTransition(this.nearTransitionZone);
+                }
+            }
+        }
+    }
+
     pickupItem(item) {
         if (item.pickup()) {
-            // Удаляем из массива
             const index = this.items.indexOf(item);
             if (index !== -1) this.items.splice(index, 1);
-
-            // Даем награду (опционально)
             const currentMemory = this.registry.get('memory') || 0;
             this.registry.set('memory', currentMemory + 5);
-
             console.log('Предмет подобран! Осталось:', this.items.length);
-
             this.nearItem = null;
             this.inputManager.showInteractionHint(false);
         }

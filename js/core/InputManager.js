@@ -28,6 +28,10 @@ class InputManager {
         });
     }
 
+    setTransitionCallback(callback) {
+        this.onTransitionConfirm = callback;
+    }
+
     // Метод, который будет вызываться из EchoScene.update()
     update(player) {
         // Здесь можно будет добавить дополнительные проверки (например, зажатые клавиши и т.д.)
@@ -51,8 +55,8 @@ class InputManager {
 
     // Полезные геттеры
     isMoving() {
-        return this.keys.W.isDown || this.keys.A.isDown || 
-               this.keys.S.isDown || this.keys.D.isDown;
+        return this.keys.W.isDown || this.keys.A.isDown ||
+            this.keys.S.isDown || this.keys.D.isDown;
     }
 
     justPressedE() {
