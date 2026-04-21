@@ -90,25 +90,23 @@ setupScrollHandler() {
 scrollContent(delta) {
     const totalHeight = this.scene.scale.height;
     const terminalHeight = totalHeight * this.currentHeight;
-    const visibleHeight = terminalHeight - 32 - 36;
+    const inputHeight = 36;
+    const visibleHeight = terminalHeight - 32 - inputHeight - 10; // Вычитаем 10 пикселей
     const totalContentHeight = this.historyLines.length * 22;
     
     if (totalContentHeight <= visibleHeight) {
         return;
     }
     
-    this.maxScrollOffset = totalContentHeight - visibleHeight;
+    this.maxScrollOffset = totalContentHeight - visibleHeight + 10;
     
-    // Применяем дельту
     let newOffset = this.scrollOffset + delta;
     newOffset = Phaser.Math.Clamp(newOffset, 0, this.maxScrollOffset);
     
-    // Если пользователь прокрутил вверх - запоминаем, что он не хочет автоскролл
     if (newOffset < this.maxScrollOffset) {
         this.userScrolledUp = true;
     }
     
-    // Если прокрутили до самого низа - сбрасываем флаг
     if (newOffset >= this.maxScrollOffset) {
         this.userScrolledUp = false;
     }
@@ -122,11 +120,13 @@ scrollContent(delta) {
 scrollToBottom() {
     const totalHeight = this.scene.scale.height;
     const terminalHeight = totalHeight * this.currentHeight;
-    const visibleHeight = terminalHeight - 32 - 36;
+    const inputHeight = 36;
+    const visibleHeight = terminalHeight - 32 - inputHeight - 10; // Вычитаем 10 пикселей отступа
     const totalContentHeight = this.historyLines.length * 22;
     
     if (totalContentHeight > visibleHeight) {
-        this.scrollOffset = totalContentHeight - visibleHeight;
+        // Добавляем отступ при прокрутке вниз
+        this.scrollOffset = totalContentHeight - visibleHeight + 10;
         this.maxScrollOffset = this.scrollOffset;
     } else {
         this.scrollOffset = 0;
@@ -314,6 +314,7 @@ scrollToBottom() {
     
 addHistoryLine(text, color = '#cccccc', isError = false) {
     const maxWidth = this.getEchoWidth() - 20;
+    // Увеличиваем отступ между строками и добавляем отступ снизу
     const yPos = 10 + this.historyLines.length * 22;
     
     const lineText = this.scene.add.text(10, yPos, text, {
@@ -326,7 +327,6 @@ addHistoryLine(text, color = '#cccccc', isError = false) {
     this.terminalContent.add(lineText);
     this.historyLines.push(lineText);
     
-    // Прокручиваем вниз ТОЛЬКО если пользователь не прокрутил вверх
     if (!this.userScrolledUp) {
         this.scrollToBottom();
     }
@@ -388,12 +388,12 @@ addHistoryLine(text, color = '#cccccc', isError = false) {
         this.scrollToBottom();
     }
     
-    updateHistoryPositions() {
-        this.historyLines.forEach((line, index) => {
-            line.setY(10 + index * 22);
-        });
-        this.scrollToBottom();
-    }
+updateHistoryPositions() {
+    this.historyLines.forEach((line, index) => {
+        line.setY(10 + index * 22);
+    });
+    this.scrollToBottom();
+}
     
     getEchoWidth() {
         const totalWidth = this.scene.scale.width;

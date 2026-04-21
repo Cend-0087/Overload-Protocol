@@ -3,7 +3,7 @@ class EchoScene extends Phaser.Scene {
         super({ key: 'EchoScene', active: true });
 
         this.gameConfig = {
-            playerSpeed: 480,
+            playerSpeed: 180,
             rayCount: 20,
             maxRayCount: 1000,
             maxDistance: 520,
@@ -43,8 +43,8 @@ class EchoScene extends Phaser.Scene {
         // Создание игрока ПОСЛЕ создания стен
         this.player = new Player(this, 450, 360);
 
-        // ВАЖНО: Добавляем коллизию между игроком и стенами
-        this.physics.add.collider(this.player, this.walls);
+// Коллизия с устройствами добавляется в LevelManager при создании устройств
+
 
         // === INPUT MANAGER ===
         this.inputManager = new InputManager(this);
@@ -72,6 +72,10 @@ class EchoScene extends Phaser.Scene {
         this.nearItem = null;
         this.transitionZones = [];
         this.nearTransitionZone = null;
+
+        this.devices = [];
+        this.nearDevice = null;
+        this.miniGameManager = new MiniGameManager(this);
 
         // Создаем менеджер уровней
         this.levelManager = new LevelManager(this);
@@ -186,24 +190,25 @@ class EchoScene extends Phaser.Scene {
         }
     }
 
-    update() {
-        if (this.player && this.player.body) {
-            this.player.update(this.inputManager.keys, this.gameConfig.playerSpeed);
-        }
-
-        if (Phaser.Input.Keyboard.JustDown(this.inputManager.keys.SPACE)) {
-            const pos = this.player.getPosition();
-            this.lidarSystem.emitPulse(pos.x, pos.y, this.walls, this.memoryPoints, this.registry);
-        }
-
-        this.inputManager.update(this.player);
-        this.checkNearbyItems();
-        this.checkTransitionZones();
-
-        if (this.inputManager.justPressedE()) {
-            this.handleInteraction();
-        }
+update() {
+    if (this.player && this.player.body) {
+        this.player.update(this.inputManager.keys, this.gameConfig.playerSpeed);
     }
+
+    if (Phaser.Input.Keyboard.JustDown(this.inputManager.keys.SPACE)) {
+        const pos = this.player.getPosition();
+        this.lidarSystem.emitPulse(pos.x, pos.y, this.walls, this.memoryPoints, this.registry);
+    }
+
+    this.inputManager.update(this.player);
+    this.checkNearbyItems();
+    this.checkTransitionZones();
+    this.checkNearbyDevices(); // <-- ДОБАВИТЬ ЭТУ СТРОКУ
+
+    if (this.inputManager.justPressedE()) {
+        this.handleInteraction();
+    }
+}
 
     checkNearbyItems() {
         if (!this.player) return;
@@ -221,7 +226,30 @@ class EchoScene extends Phaser.Scene {
         } else if (!this.nearTransitionZone) {
             this.inputManager.showInteractionHint(false);
         }
+
+
+
     }
+
+checkNearbyDevices() {
+    if (!this.player) return;
+    const playerPos = this.player.getPosition();
+    let found = null;
+    
+    for (let device of this.devices) {
+        if (device.canInteract(playerPos.x, playerPos.y)) {
+            found = device;
+            break;
+        }
+    }
+    
+    this.nearDevice = found;
+    
+    // Показываем подсказку для устройства
+    if (this.nearDevice && !this.nearItem && !this.nearTransitionZone) {
+        this.inputManager.showInteractionHint(true, playerPos.x, playerPos.y - 30);
+    }
+}
 
     checkTransitionZones() {
         if (!this.player || this.pendingTransition) return;
@@ -241,17 +269,42 @@ class EchoScene extends Phaser.Scene {
         }
     }
 
-    handleInteraction() {
-        if (this.nearItem) {
-            this.pickupItem(this.nearItem);
-        } else if (this.nearTransitionZone) {
-            const terminalScene = this.scene.get('TerminalScene');
-            if (terminalScene && !terminalScene.pendingTransition) {
-                const result = this.nearTransitionZone.interact();
-                if (result.success) {
-                    terminalScene.requestTransition(this.nearTransitionZone);
-                }
+handleInteraction() {
+    if (this.nearItem) {
+        this.pickupItem(this.nearItem);
+    } else if (this.nearTransitionZone) {
+        const terminalScene = this.scene.get('TerminalScene');
+        if (terminalScene && !terminalScene.pendingTransition) {
+            const result = this.nearTransitionZone.interact();
+            if (result.success) {
+                terminalScene.requestTransition(this.nearTransitionZone);
             }
+        }
+    } else if (this.nearDevice) {
+        const terminalScene = this.scene.get('TerminalScene');
+        if (terminalScene) {
+            const result = this.nearDevice.interact();
+            if (result.success) {
+                terminalScene.requestDeviceInteraction(this.nearDevice);
+            }
+        }
+    }
+}
+
+    openDoor(doorId) {
+        console.log(`Открываем дверь ${doorId}`);
+        // Здесь будет логика удаления/изменения стены-двери
+    }
+
+    upgradePlayer(upgrade) {
+        if (upgrade.speed) {
+            this.gameConfig.playerSpeed += upgrade.speed;
+            console.log(`Скорость увеличена до ${this.gameConfig.playerSpeed}`);
+        }
+        if (upgrade.memory) {
+            const currentMax = this.registry.get('maxMemory') || 45;
+            this.registry.set('maxMemory', currentMax + upgrade.memory);
+            console.log(`Максимум памяти увеличен до ${this.registry.get('maxMemory')}`);
         }
     }
 

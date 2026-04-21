@@ -3,10 +3,12 @@
 class TerminalScene extends Phaser.Scene {
     constructor() {
         super({ key: 'TerminalScene', active: true });
-
         this.commandLine = null;
         this.isInputActive = false;
         this.consoleCamera = null;
+        this.currentDevice = null; // Текущее устройство для взаимодействия
+        this.waitingForHackCommand = false;
+        this.waitingForDeviceAction = false;
     }
 
     create() {
@@ -249,6 +251,12 @@ class TerminalScene extends Phaser.Scene {
                 this.commandLine.log('Нет ожидающих переходов', '#888888');
             }
         }
+        else if (cmd === 'hack' && this.waitingForHackCommand && this.currentDevice) {
+            this.startHacking();
+        }
+        else if ((cmd === '1' || cmd === '2' || cmd === '3') && this.waitingForDeviceAction && this.currentDevice) {
+            this.executeDeviceAction(parseInt(cmd));
+        }
 
 
         else {
@@ -271,6 +279,101 @@ class TerminalScene extends Phaser.Scene {
 
 
 
+    }
+
+requestDeviceInteraction(device) {
+    this.currentDevice = device;
+    this.waitingForHackCommand = !device.isHacked;
+    this.waitingForDeviceAction = device.isHacked;
+    
+    if (!device.isHacked) {
+        this.commandLine.log("\n🔐 Подключение к устройству установлено", '#9b59b6');
+        this.commandLine.log("Введите 'hack' для взлома", '#ffff00');
+    } else {
+        this.commandLine.log("\n💻 Устройство взломано. Выберите действие:", '#00ffcc');
+        this.commandLine.log("1) Загрузить данные на свой диск", '#cccccc');
+        this.commandLine.log("2) Открыть запертую дверь", '#cccccc');
+        this.commandLine.log("3) Обновить свое ПО", '#cccccc');
+    }
+    
+    this.activateInput();
+}
+
+executeDeviceAction(actionNumber) {
+    this.waitingForDeviceAction = false;
+    const result = this.currentDevice.executeAction(actionNumber);
+    
+    if (result.success) {
+        this.commandLine.success(result.message);
+        
+        // Обрабатываем разные типы действий
+        switch(result.type) {
+            case 'download_data':
+                this.commandLine.log(`📀 ${result.lore}`, '#88ff88');
+                // Добавляем в память игрока
+                const currentMemory = this.registry.get('memory') || 0;
+                this.registry.set('memory', currentMemory + 15);
+                break;
+                
+            case 'open_door':
+                // Открываем дверь в EchoScene
+                const echoScene = this.scene.get('EchoScene');
+                if (echoScene && echoScene.openDoor) {
+                    echoScene.openDoor(result.doorId);
+                }
+                break;
+                
+            case 'upgrade_player':
+                // Улучшаем игрока
+                const echoScene2 = this.scene.get('EchoScene');
+                if (echoScene2 && echoScene2.upgradePlayer) {
+                    echoScene2.upgradePlayer(result.upgrade);
+                }
+                break;
+        }
+    } else {
+        this.commandLine.error(result.message);
+    }
+    
+    this.currentDevice = null;
+}
+
+handleHackResult(isSuccess) {
+    if (!this.currentDevice) return;
+    
+    const result = this.currentDevice.hack(isSuccess);
+    
+    if (result.success) {
+        this.commandLine.success(result.message);
+        this.commandLine.log("Теперь у вас есть доступ к функциям устройства!", '#00ffcc');
+        this.waitingForDeviceAction = true;
+    } else {
+        this.commandLine.error(result.message);
+        
+        // Увеличиваем внимание при провале
+        if (result.attentionIncrease) {
+            const currentAttention = this.registry.get('attention') || 0;
+            const newAttention = Math.min(currentAttention + result.attentionIncrease, 100);
+            this.registry.set('attention', newAttention);
+            this.commandLine.log(`⚠️ Внимание повышено до ${newAttention}%`, '#ff6600');
+        }
+        
+        // Даем еще одну попытку
+        this.commandLine.log("Попробуйте снова: введите 'hack'", '#ffff00');
+        this.waitingForHackCommand = true;
+    }
+}
+
+    startHacking() {
+        this.waitingForHackCommand = false;
+        this.commandLine.log("Запуск взлома...", '#9b59b6');
+
+        const echoScene = this.scene.get('EchoScene');
+        if (echoScene && echoScene.miniGameManager) {
+            echoScene.miniGameManager.startHackingGame(this.currentDevice, (isSuccess) => {
+                this.handleHackResult(isSuccess);
+            });
+        }
     }
 
     requestTransition(zone) {
