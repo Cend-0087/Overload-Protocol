@@ -96,6 +96,8 @@ loadLevel1() {
         this.levelObjects.walls.push(wall);
     });
 
+
+
     // Добавляем предметы
     const testItem = new PickupItem(this.scene, 600, 500);
     this.levelObjects.items.push(testItem);

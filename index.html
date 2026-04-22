@@ -32,6 +32,8 @@
     <!-- Phaser -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.2/dist/phaser.min.js"></script>
 
+
+
     <!-- Core системы -->
     <script src="js/core/Player.js"></script>
     <script src="js/core/LidarSystem.js"></script>
@@ -67,6 +69,20 @@
     
     <!-- Менеджеры -->
     <script src="js/managers/MusicManager.js"></script>
+
+<script>document.body.addEventListener('click', () => {
+    const musicManager = window.game?.registry?.get('musicManager');
+    if (musicManager && !musicManager.isInitialized) {
+        musicManager.init();
+    }
+}, { once: true });
+
+document.body.addEventListener('keydown', () => {
+    const musicManager = window.game?.registry?.get('musicManager');
+    if (musicManager && !musicManager.isInitialized) {
+        musicManager.init();
+    }
+}, { once: true });</script>
     
     <!-- Эффекты -->
     <script src="js/effects/GlitchPipeLine.js"></script>

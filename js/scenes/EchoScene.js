@@ -85,6 +85,24 @@ class EchoScene extends Phaser.Scene {
         this.currentTransitionZone = null;
         this.pendingTransition = false;
 
+    this.load.audio('calm', '/sounds/спокойная.mp3');
+    this.load.once('complete', () => {
+        console.log('Музыка загружена');
+    });
+    this.load.start();
+    
+    // Создаем MusicManager
+    this.musicManager = new MusicManager(this);
+    
+    // Ждем первое взаимодействие
+    this.input.keyboard.on('keydown', () => {
+        this.musicManager.startMusic();
+    });
+    
+    this.input.on('pointerdown', () => {
+        this.musicManager.startMusic();
+    });
+
         // Подписка на события
         const uiScene = this.scene.get('UIScene');
         if (uiScene) {
@@ -97,6 +115,8 @@ class EchoScene extends Phaser.Scene {
         // Управление
         this.cursors = this.input.keyboard.createCursorKeys();
         this.keys = this.input.keyboard.addKeys('W,A,S,D,SPACE');
+
+
 
         // Разделитель интерфейса
         this.createDivider();
@@ -157,6 +177,48 @@ class EchoScene extends Phaser.Scene {
             this.updateViewports();
         });
     }
+
+setupFirstInteraction() {
+    let interactionHandled = false;
+    
+    const handleFirstInteraction = () => {
+        if (interactionHandled) return;
+        interactionHandled = true;
+        
+        console.log('Первое взаимодействие с игрой - активируем звук');
+        
+        // Инициализируем MusicManager
+        if (this.musicManager) {
+            this.musicManager.init();
+        }
+        
+        // Удаляем обработчики после первого срабатывания
+        this.input.keyboard.off('keydown', handleFirstInteraction);
+        this.input.off('pointerdown', handleFirstInteraction);
+        
+        // Опционально: показать сообщение о включении звука
+        const soundNotification = this.add.text(
+            this.cameras.main.centerX,
+            this.cameras.main.centerY,
+            '🔊 Звук активирован',
+            {
+                fontSize: '24px',
+                fontFamily: 'Courier New',
+                color: '#00ffcc',
+                backgroundColor: '#000000aa',
+                padding: { x: 20, y: 10 }
+            }
+        ).setOrigin(0.5).setScrollFactor(0).setDepth(10000);
+        
+        this.time.delayedCall(2000, () => {
+            soundNotification.destroy();
+        });
+    };
+    
+    // Вешаем обработчики на любые взаимодействия
+    this.input.keyboard.on('keydown', handleFirstInteraction);
+    this.input.on('pointerdown', handleFirstInteraction);
+}
 
     setupCamera() {
         this.cameras.main.startFollow(this.player, true,
