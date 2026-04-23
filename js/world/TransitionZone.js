@@ -5,54 +5,66 @@ class TransitionZone {
         this.y = y;
         this.width = width;
         this.height = height;
-        this.targetLevel = targetLevel; // на какой уровень переходим
+        this.targetLevel = targetLevel;
         this.isActive = true;
-        this.interactionRadius = Math.max(width, height) / 2 + 20; // зона взаимодействия
+        this.isDiscovered = false;
         
         // Визуальное представление - желтый квадрат
-        this.graphics = scene.add.rectangle(x, y, width, height, 0xffaa00, 0.5);
+        this.graphics = scene.add.rectangle(x, y, width, height, 0xffaa00, 0.4);
         this.graphics.setStrokeStyle(2, 0xffdd44, 1);
-        
-        // Добавляем пульсирующую анимацию
-        this.createPulseAnimation();
+        this.graphics.setVisible(false);
     }
     
-    createPulseAnimation() {
-        // Пульсация прозрачности
-        this.scene.tweens.add({
-            targets: this.graphics,
-            alpha: 0.3,
-            duration: 800,
-            yoyo: true,
-            repeat: -1
-        });
+    // Проверка обнаружения - только когда игрок ВНУТРИ зоны
+    checkDiscovery(playerX, playerY) {
+        if (!this.isActive || this.isDiscovered) return false;
         
-        // Пульсация обводки
-        this.scene.tweens.add({
-            targets: this.graphics,
-            scale: 1.05,
-            duration: 800,
-            yoyo: true,
-            repeat: -1
-        });
+        // Вычисляем границы зоны
+        const left = this.x - this.width / 2;
+        const right = this.x + this.width / 2;
+        const top = this.y - this.height / 2;
+        const bottom = this.y + this.height / 2;
+        
+        // Проверяем, находится ли игрок ВНУТРИ прямоугольника
+        const isInside = playerX >= left && playerX <= right && playerY >= top && playerY <= bottom;
+        
+        if (isInside) {
+            this.reveal();
+            return true;
+        }
+        return false;
     }
     
-    // Проверка, рядом ли игрок
+    reveal() {
+        if (this.isDiscovered) return;
+        
+        this.isDiscovered = true;
+        this.graphics.setVisible(true);
+        
+        const terminalScene = this.scene.scene.get('TerminalScene');
+        if (terminalScene && terminalScene.commandLine) {
+            terminalScene.commandLine.log(`[ОБНАРУЖЕНО] Переходная зона (Уровень ${this.targetLevel})`, '#ffaa00');
+        }
+    }
+    
     canInteract(playerX, playerY) {
-        if (!this.isActive) return false;
+        if (!this.isActive || !this.isDiscovered) return false;
         
-        const dx = this.x - playerX;
-        const dy = this.y - playerY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        // Вычисляем границы зоны
+        const left = this.x - this.width / 2;
+        const right = this.x + this.width / 2;
+        const top = this.y - this.height / 2;
+        const bottom = this.y + this.height / 2;
         
-        return distance <= this.interactionRadius;
+        // Взаимодействовать можно только внутри зоны
+        const isInside = playerX >= left && playerX <= right && playerY >= top && playerY <= bottom;
+        
+        return isInside;
     }
     
-    // Взаимодействие с зоной перехода
     interact() {
-        if (!this.isActive) return false;
+        if (!this.isActive || !this.isDiscovered) return { success: false };
         
-        // Возвращаем информацию о переходе
         return {
             success: true,
             targetLevel: this.targetLevel,
@@ -60,19 +72,14 @@ class TransitionZone {
         };
     }
     
-    // Получить позицию
     getPosition() {
         return { x: this.x, y: this.y };
     }
     
-    // Деактивировать зону
     deactivate() {
         this.isActive = false;
-        if (this.graphics) {
-            this.graphics.destroy();
-        }
+        if (this.graphics) this.graphics.destroy();
     }
 }
 
-// Экспорт
 window.TransitionZone = TransitionZone;

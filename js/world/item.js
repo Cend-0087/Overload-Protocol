@@ -3,39 +3,63 @@ class PickupItem {
         this.scene = scene;
         this.x = x;
         this.y = y;
-        this.radius = 8; // размер для коллизии
-        this.interactionRadius = 40; // зона взаимодействия
+        this.radius = 8;
+        this.interactionRadius = 50;
         this.isActive = true;
+        this.isDiscovered = false;
         
-        // Просто красный квадрат/круг для визуального представления
+        // Визуальное представление - красный круг
         this.graphics = scene.add.circle(x, y, 8, 0xff0000);
+        this.graphics.setVisible(false);
     }
     
-    // Проверка, рядом ли игрок
-    canInteract(playerX, playerY) {
-        if (!this.isActive) return false;
+    checkDiscovery(playerX, playerY) {
+        if (!this.isActive || this.isDiscovered) return false;
         
         const dx = this.x - playerX;
         const dy = this.y - playerY;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
-        return distance <= this.interactionRadius;
+        if (distance <= this.interactionRadius) {
+            this.reveal();
+            return true;
+        }
+        return false;
     }
     
-    // Подобрать предмет
+    reveal() {
+        if (this.isDiscovered) return;
+        
+        this.isDiscovered = true;
+        this.graphics.setVisible(true);
+        
+        const terminalScene = this.scene.scene.get('TerminalScene');
+        if (terminalScene && terminalScene.commandLine) {
+            terminalScene.commandLine.log(`[ОБНАРУЖЕНО] Предмет`, '#ff0000');
+        }
+    }
+    
+    canInteract(playerX, playerY) {
+        if (!this.isActive || !this.isDiscovered) return false;
+        
+        const dx = this.x - playerX;
+        const dy = this.y - playerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        return distance <= 40;
+    }
+    
     pickup() {
-        if (!this.isActive) return false;
+        if (!this.isActive || !this.isDiscovered) return false;
         
         this.isActive = false;
-        this.graphics.destroy(); // удаляем визуал
+        this.graphics.destroy();
         return true;
     }
     
-    // Получить позицию
     getPosition() {
         return { x: this.x, y: this.y };
     }
 }
 
-// Экспорт
 window.PickupItem = PickupItem;

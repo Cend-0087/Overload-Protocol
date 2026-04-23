@@ -23,6 +23,8 @@ class Player extends Phaser.GameObjects.Sprite {
         this.body.setCircle(8);
         this.body.setCollideWorldBounds(true);
         this.body.setBounce(0);
+
+        this.canMove = true;
         
         // Сохраняем ссылку на сцену
         this.scene = scene;
@@ -30,6 +32,8 @@ class Player extends Phaser.GameObjects.Sprite {
 
     update(keys, speed) {
         if (!this.body) return;
+        if (!this.body || !this.canMove) return; // Добавить проверку
+
 
         this.body.setVelocity(0);
 

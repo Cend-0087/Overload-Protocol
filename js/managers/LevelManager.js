@@ -89,21 +89,19 @@ clearCurrentLevel() {
 loadLevel1() {
     this.scene.devices = [];
     
-    // Загружаем стены из WallManager
-    const wallManager = new WallManager(this.scene, WallManager.getDefaultWalls());
-    const walls = wallManager.create();
+    // Загружаем стены из WallManager и СОХРАНЯЕМ wallManager в сцене
+    this.scene.wallManager = new WallManager(this.scene, WallManager.getDefaultWalls());
+    const walls = this.scene.wallManager.create();
     walls.getChildren().forEach(wall => {
         this.levelObjects.walls.push(wall);
     });
-
-
 
     // Добавляем предметы
     const testItem = new PickupItem(this.scene, 600, 500);
     this.levelObjects.items.push(testItem);
 
     // Добавляем переходную зону
-    const transitionZone = new TransitionZone(this.scene, 1370, 350, 300, 300, 2);
+    const transitionZone = new TransitionZone(this.scene, 1376, 300, 300, 240, 2);
     this.levelObjects.transitionZones.push(transitionZone);
 
     // Сохраняем ссылки в сцене
@@ -114,8 +112,8 @@ loadLevel1() {
     this.scene.items = this.levelObjects.items;
     this.scene.transitionZones = this.levelObjects.transitionZones;
 
-    // СОЗДАЕМ УСТРОЙСТВО
-    const testDevice = new Device(this.scene, 700, 650, 'computer');
+    // СОЗДАЕМ УСТРОЙСТВО С doorId
+    const testDevice = new Device(this.scene, 700, 650, 'computer', "door_main_1");
     this.levelObjects.devices.push(testDevice);
     this.scene.devices.push(testDevice);
     
@@ -143,6 +141,14 @@ loadLevel2() {
         { x: 1500, y: 500, width: 400, height: 20, color: 0x444444 },
         { x: 2200, y: 300, width: 20, height: 400, color: 0x444444 },
         { x: 2800, y: 600, width: 400, height: 20, color: 0x444444 },
+        
+        // ЗАПЕРТАЯ ДВЕРЬ - блокирует проход к переходной зоне
+        { 
+            x: 1350, y: 500, width: 60, height: 20, 
+            color: 0x444444, 
+            isDoor: true, 
+            doorId: "door_to_transition" 
+        },
     ];
 
     const wallManager = new WallManager(this.scene, wallsData);
@@ -168,14 +174,14 @@ loadLevel2() {
     this.scene.items = this.levelObjects.items;
     this.scene.transitionZones = this.levelObjects.transitionZones;
 
-    // ДОБАВЛЯЕМ УСТРОЙСТВО ДЛЯ УРОВНЯ 2
-    const testDevice2 = new Device(this.scene, 1800, 550, 'laptop');
-    this.levelObjects.devices.push(testDevice2);
-    this.scene.devices.push(testDevice2);
+    // СОЗДАЕМ УСТРОЙСТВО, которое открывает эту дверь
+    const testDevice = new Device(this.scene, 700, 550, 'computer', "door_to_transition");
+    this.levelObjects.devices.push(testDevice);
+    this.scene.devices.push(testDevice);
     
     // ДОБАВЛЯЕМ КОЛЛИЗИЮ С УСТРОЙСТВОМ
-    if (testDevice2.body) {
-        this.scene.physics.add.collider(this.scene.player, testDevice2.body.gameObject);
+    if (testDevice.body) {
+        this.scene.physics.add.collider(this.scene.player, testDevice.body.gameObject);
     }
 
     // Настраиваем коллизию со стенами

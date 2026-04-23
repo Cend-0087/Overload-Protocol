@@ -1,54 +1,69 @@
 class Device {
-    constructor(scene, x, y, deviceType = 'computer') {
-        this.scene = scene;
-        this.x = x;
-        this.y = y;
-        this.deviceType = deviceType;
-        this.radius = 12;
-        this.interactionRadius = 45;
-        this.isActive = true;
-        this.isHacked = false;
-        this.hackAttempts = 0;
-        
-        // Визуальное представление - фиолетовый квадрат
-        this.graphics = scene.add.rectangle(x, y, 20, 20, 0x9b59b6, 0.9);
-        this.graphics.setStrokeStyle(2, 0x8e44ad, 1);
-        this.graphics.setDepth(100);
-        
-        // Добавляем "экран" (маленький белый квадратик внутри)
-        this.screen = scene.add.rectangle(x, y, 12, 12, 0xecf0f1, 0.8);
-        this.screen.setDepth(101);
-        
-        // ДОБАВЛЯЕМ ФИЗИЧЕСКОЕ ТЕЛО
-        scene.physics.add.existing(this.graphics, true); // true = статическое тело
-        this.body = this.graphics.body;
-        if (this.body) {
+constructor(scene, x, y, deviceType = 'computer', doorId = null) {
+    this.scene = scene;
+    this.x = x;
+    this.y = y;
+    this.deviceType = deviceType;
+    this.doorId = doorId; // Теперь doorId определен
+    this.radius = 12;
+    this.interactionRadius = 70;
+    this.isActive = true;
+    this.isHacked = false;
+    this.hackAttempts = 0;
+    this.isDiscovered = false;
+    
+    // Визуальное представление - фиолетовый квадрат
+    this.graphics = scene.add.rectangle(x, y, 20, 20, 0x9b59b6, 0.9);
+    this.graphics.setStrokeStyle(2, 0x8e44ad, 1);
+    this.graphics.setDepth(100);
+    this.graphics.setVisible(false);
+    
+    // Добавляем "экран" (маленький белый квадратик внутри)
+    this.screen = scene.add.rectangle(x, y, 12, 12, 0xecf0f1, 0.8);
+    this.screen.setDepth(101);
+    this.screen.setVisible(false);
+    
+    // Добавляем физическое тело
+    scene.physics.add.existing(this.graphics, true);
+    this.body = this.graphics.body;
+    if (this.body) {
         this.body.setSize(20, 20);
-        }
-
-        
-        
-        // Пульсация для привлечения внимания
-        this.createPulseAnimation();
-        
-        // Хранилище данных (лор)
-        this.data = {
-            id: `device_${Date.now()}_${Math.random()}`,
-            type: deviceType,
-            unlockedDoors: [],
-            lore: this.getRandomLore()
-        };
     }
     
-    // Остальные методы без изменений...
-    createPulseAnimation() {
-        this.scene.tweens.add({
-            targets: [this.graphics, this.screen],
-            scale: 1.05,
-            duration: 1000,
-            yoyo: true,
-            repeat: -1
-        });
+    // Хранилище данных
+    this.data = {
+        id: `device_${Date.now()}_${Math.random()}`,
+        type: deviceType,
+        unlockedDoors: doorId ? [doorId] : [],
+        lore: this.getRandomLore()
+    };
+}
+    
+    checkDiscovery(playerX, playerY) {
+        if (!this.isActive || this.isDiscovered) return false;
+        
+        const dx = this.x - playerX;
+        const dy = this.y - playerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance <= this.interactionRadius) {
+            this.reveal();
+            return true;
+        }
+        return false;
+    }
+    
+    reveal() {
+        if (this.isDiscovered) return;
+        
+        this.isDiscovered = true;
+        this.graphics.setVisible(true);
+        this.screen.setVisible(true);
+        
+        const terminalScene = this.scene.scene.get('TerminalScene');
+        if (terminalScene && terminalScene.commandLine) {
+            terminalScene.commandLine.log(`[ОБНАРУЖЕНО] Устройство: ${this.deviceType}`, '#9b59b6');
+        }
     }
     
     getRandomLore() {
@@ -63,15 +78,17 @@ class Device {
     }
     
     canInteract(playerX, playerY) {
-        if (!this.isActive) return false;
+        if (!this.isActive || !this.isDiscovered) return false;
+        
         const dx = this.x - playerX;
         const dy = this.y - playerY;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        return distance <= this.interactionRadius;
+        
+        return distance <= 45;
     }
     
     interact() {
-        if (!this.isActive) return { success: false, message: "Устройство неактивно" };
+        if (!this.isActive || !this.isDiscovered) return { success: false, message: "Устройство не обнаружено" };
         
         if (!this.isHacked) {
             return {
@@ -117,12 +134,19 @@ class Device {
                     lore: this.data.lore
                 };
             case 2:
-                return {
-                    success: true,
-                    type: 'open_door',
-                    message: "Дверь разблокирована!",
-                    doorId: this.data.unlockedDoors[0]
-                };
+                if (this.data.unlockedDoors.length > 0) {
+                    return {
+                        success: true,
+                        type: 'open_door',
+                        message: "Дверь разблокирована!",
+                        doorId: this.data.unlockedDoors[0]
+                    };
+                } else {
+                    return {
+                        success: false,
+                        message: "Нет доступных дверей для открытия"
+                    };
+                }
             case 3:
                 return {
                     success: true,

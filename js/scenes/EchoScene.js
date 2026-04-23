@@ -28,6 +28,7 @@ class EchoScene extends Phaser.Scene {
         // Инициализация систем
         this.memorySystem = new MemorySystem(this.registry);
         this.attentionSystem = new AttentionSystem(this.registry);
+        this.testMode = null;
 
         this.memorySystem.init();
         this.attentionSystem.init();
@@ -93,6 +94,14 @@ class EchoScene extends Phaser.Scene {
     
     // Создаем MusicManager
     this.musicManager = new MusicManager(this);
+
+const openedDoors = this.registry.get('openedDoors') || [];
+if (openedDoors.length > 0 && this.wallManager) {
+    openedDoors.forEach(doorId => {
+        this.wallManager.openDoor(doorId);
+        console.log(`[EchoScene] Дверь ${doorId} уже была открыта, удаляем`);
+    });
+}
     
     // Ждем первое взаимодействие
     this.input.keyboard.on('keydown', () => {
@@ -253,7 +262,7 @@ setupFirstInteraction() {
     }
 
 update() {
-    if (this.player && this.player.body) {
+    if (this.player && this.player.body && this.player.canMove !== false) {
         this.player.update(this.inputManager.keys, this.gameConfig.playerSpeed);
     }
 
@@ -263,12 +272,36 @@ update() {
     }
 
     this.inputManager.update(this.player);
+    
+    // Проверка обнаружения объектов
+    this.checkDiscovery();
+    
     this.checkNearbyItems();
     this.checkTransitionZones();
-    this.checkNearbyDevices(); // <-- ДОБАВИТЬ ЭТУ СТРОКУ
+    this.checkNearbyDevices();
 
     if (this.inputManager.justPressedE()) {
         this.handleInteraction();
+    }
+}
+
+checkDiscovery() {
+    if (!this.player) return;
+    const playerPos = this.player.getPosition();
+    
+    // Проверяем предметы
+    for (let item of this.items) {
+        item.checkDiscovery(playerPos.x, playerPos.y);
+    }
+    
+    // Проверяем устройства
+    for (let device of this.devices) {
+        device.checkDiscovery(playerPos.x, playerPos.y);
+    }
+    
+    // Проверяем зоны перехода
+    for (let zone of this.transitionZones) {
+        zone.checkDiscovery(playerPos.x, playerPos.y);
     }
 }
 
@@ -353,10 +386,30 @@ handleInteraction() {
     }
 }
 
-    openDoor(doorId) {
-        console.log(`Открываем дверь ${doorId}`);
-        // Здесь будет логика удаления/изменения стены-двери
+openDoor(doorId) {
+    console.log(`[EchoScene] Попытка открыть дверь: ${doorId}`);
+    
+    // Используем WallManager для открытия двери
+    if (this.wallManager && this.wallManager.openDoor(doorId)) {
+        const terminalScene = this.scene.get('TerminalScene');
+        if (terminalScene && terminalScene.commandLine) {
+            terminalScene.commandLine.success(`Дверь ${doorId} открыта!`);
+        }
+        
+        // Сохраняем в реестр, что дверь открыта (для сохранения между уровнями)
+        const openedDoors = this.registry.get('openedDoors') || [];
+        if (!openedDoors.includes(doorId)) {
+            openedDoors.push(doorId);
+            this.registry.set('openedDoors', openedDoors);
+        }
+    } else {
+        const terminalScene = this.scene.get('TerminalScene');
+        if (terminalScene && terminalScene.commandLine) {
+            terminalScene.commandLine.error(`Не удалось открыть дверь ${doorId}`);
+        }
     }
+}
+
 
     upgradePlayer(upgrade) {
         if (upgrade.speed) {

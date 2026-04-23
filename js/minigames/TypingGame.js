@@ -8,29 +8,33 @@ class TypingGame {
         // Параметры
         this.targetSequence = "";
         this.userInput = "";
-        this.timeLeft = 5;
+        this.timeLeft = 9;
         
-        // Создаем UI
+        // Создаем UI (привязанный к камере)
         this.createUI();
         this.startGame();
     }
     
     createUI() {
-        // Затемнение
-        this.overlay = this.scene.add.rectangle(0, 0, this.scene.scale.width, this.scene.scale.height, 0x000000, 0.8);
-        this.overlay.setDepth(20000);
-        this.overlay.setOrigin(0, 0);
+        // Получаем координаты центра камеры
+        const centerX = this.scene.cameras.main.centerX;
+        const centerY = this.scene.cameras.main.centerY;
         
-        // Окно игры (по центру)
+        // Затемнение (привязано к камере)
+        this.overlay = this.scene.add.rectangle(centerX, centerY, this.scene.cameras.main.width, this.scene.cameras.main.height, 0x000000, 0.8);
+        this.overlay.setDepth(20000);
+        this.overlay.setScrollFactor(0); // Привязываем к камере
+        this.overlay.setOrigin(0.5, 0.5);
+        
+        // Окно игры (по центру камеры)
         const windowWidth = 500;
         const windowHeight = 300;
-        const centerX = this.scene.scale.width / 2;
-        const centerY = this.scene.scale.height / 2;
         
         // Фон окна
         this.windowBg = this.scene.add.rectangle(centerX, centerY, windowWidth, windowHeight, 0x1a1a1a);
         this.windowBg.setStrokeStyle(2, 0x9b59b6);
         this.windowBg.setDepth(20001);
+        this.windowBg.setScrollFactor(0); // Привязываем к камере
         
         // Текст с последовательностью
         this.sequenceText = this.scene.add.text(centerX, centerY - 60, "", {
@@ -39,6 +43,7 @@ class TypingGame {
             fontFamily: "Courier New"
         }).setOrigin(0.5);
         this.sequenceText.setDepth(20002);
+        this.sequenceText.setScrollFactor(0); // Привязываем к камере
         
         // Поле ввода
         this.inputText = this.scene.add.text(centerX, centerY, "", {
@@ -47,6 +52,7 @@ class TypingGame {
             fontFamily: "Courier New"
         }).setOrigin(0.5);
         this.inputText.setDepth(20002);
+        this.inputText.setScrollFactor(0); // Привязываем к камере
         
         // Таймер
         this.timerText = this.scene.add.text(centerX, centerY + 80, "", {
@@ -55,6 +61,7 @@ class TypingGame {
             fontFamily: "Courier New"
         }).setOrigin(0.5);
         this.timerText.setDepth(20002);
+        this.timerText.setScrollFactor(0); // Привязываем к камере
         
         // Сообщение
         this.messageText = this.scene.add.text(centerX, centerY + 130, "", {
@@ -63,18 +70,40 @@ class TypingGame {
             fontFamily: "Courier New"
         }).setOrigin(0.5);
         this.messageText.setDepth(20002);
+        this.messageText.setScrollFactor(0); // Привязываем к камере
         
-        // Настройка ввода
+        // Настройка ввода и блокировка управления
         this.setupInput();
+        this.lockPlayerControl(true);
+    }
+    
+    lockPlayerControl(lock) {
+        // Блокируем движение игрока
+        const echoScene = this.scene.scene.get('EchoScene');
+        if (echoScene && echoScene.player) {
+            echoScene.player.canMove = !lock;
+        }
+        
+        // Блокируем ввод в терминале
+        const terminalScene = this.scene.scene.get('TerminalScene');
+        if (terminalScene) {
+            if (lock) {
+                terminalScene.input.keyboard.enabled = false;
+                if (terminalScene.commandLine) {
+                    terminalScene.commandLine.deactivate();
+                }
+            } else {
+                terminalScene.input.keyboard.enabled = true;
+            }
+        }
+        
+        // Блокируем общий ввод в сцене
+        if (echoScene && echoScene.input && echoScene.input.keyboard) {
+            echoScene.input.keyboard.enabled = !lock;
+        }
     }
     
     setupInput() {
-        // Блокируем основной ввод
-        const terminalScene = this.scene.scene.get('TerminalScene');
-        if (terminalScene) {
-            terminalScene.input.keyboard.enabled = false;
-        }
-        
         // Обработчик клавиш
         this.keyHandler = (event) => {
             if (!this.isActive) return;
@@ -106,16 +135,16 @@ class TypingGame {
     
     startGame() {
         // Генерируем последовательность
-        const chars = "AB";
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         this.targetSequence = "";
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 2; i++) {
             this.targetSequence += chars[Math.floor(Math.random() * chars.length)];
         }
         
         this.sequenceText.setText(this.targetSequence);
         this.userInput = "";
         this.inputText.setText("");
-        this.timeLeft = 5;
+        this.timeLeft = 10;
         this.timerText.setText(`Время: ${this.timeLeft}с`);
         this.messageText.setText("");
         
@@ -156,11 +185,8 @@ class TypingGame {
             window.removeEventListener('keydown', this.keyHandler);
         }
         
-        // Возвращаем управление
-        const terminalScene = this.scene.scene.get('TerminalScene');
-        if (terminalScene) {
-            terminalScene.input.keyboard.enabled = true;
-        }
+        // Разблокируем управление
+        this.lockPlayerControl(false);
         
         // Удаляем UI
         if (this.overlay) this.overlay.destroy();

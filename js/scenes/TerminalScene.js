@@ -258,6 +258,22 @@ class TerminalScene extends Phaser.Scene {
             this.executeDeviceAction(parseInt(cmd));
         }
 
+else if (cmd === 'testmodetrue') {
+    const echoScene = this.scene.get('EchoScene');
+    if (echoScene) {
+        if (!echoScene.testMode) {
+            echoScene.testMode = new TestMode(echoScene);
+        }
+        echoScene.testMode.enable();
+    }
+}
+else if (cmd === 'testmodefalse') {
+    const echoScene = this.scene.get('EchoScene');
+    if (echoScene && echoScene.testMode) {
+        echoScene.testMode.disable();
+    }
+}
+
 
         else {
             console.log(`[TerminalScene] Ошибка: "${cmd}"`);
