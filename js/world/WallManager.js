@@ -46,7 +46,7 @@ class WallManager {
     }
     
     static getDefaultWalls() {
-        const WALL_COLOR = 0x0a0a0a; // Объявляем переменную для цвета стен 0x0a0a0a для невидимости
+        const WALL_COLOR = 0x44444; // Объявляем переменную для цвета стен 0x0a0a0a для невидимости
         
         return [ 
 
@@ -56,6 +56,12 @@ class WallManager {
                 color: WALL_COLOR, 
                 isDoor: true, 
                 doorId: "door_main_1" 
+            },
+            { 
+                x: 2570, y: 530, width: 340, height: 20, 
+                color: WALL_COLOR, 
+                isDoor: true, 
+                doorId: "door_main_2" 
             },
             
             // Верхняя часть

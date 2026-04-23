@@ -117,6 +117,12 @@ class LidarSystem {
             memoryPoints.add(this.scene.add.circle(x, y, 3.5, 0x00ffcc, 1));
         }
     }
+
+updateConfig(config) {
+    this.rayCount = config.rayCount;
+    this.maxDistance = config.maxDistance;
+    // другие параметры при необходимости
+}
     
     createHitSpark(x, y, cfg) {
         const spark = this.scene.add.circle(x, y, cfg.hitSparkRadius, cfg.hitSparkColor, 0.85);

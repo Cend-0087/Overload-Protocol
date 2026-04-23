@@ -423,17 +423,47 @@ openDoor(doorId) {
         }
     }
 
-    pickupItem(item) {
-        if (item.pickup()) {
-            const index = this.items.indexOf(item);
-            if (index !== -1) this.items.splice(index, 1);
-            const currentMemory = this.registry.get('memory') || 0;
-            this.registry.set('memory', currentMemory + 5);
-            console.log('Предмет подобран! Осталось:', this.items.length);
-            this.nearItem = null;
-            this.inputManager.showInteractionHint(false);
+pickupItem(item) {
+    const result = item.pickup();
+    if (result && result.success) {
+        const index = this.items.indexOf(item);
+        if (index !== -1) this.items.splice(index, 1);
+        
+        // Обрабатываем разные типы предметов
+        if (result.type === 'lore') {
+            // Сохраняем лор в список
+            const loreList = this.registry.get('loreList') || [];
+            loreList.push({
+                id: Date.now(),
+                title: result.data.title,
+                text: result.data.text
+            });
+            this.registry.set('loreList', loreList);
+            
+            const terminalScene = this.scene.get('TerminalScene');
+            if (terminalScene && terminalScene.commandLine) {
+                terminalScene.commandLine.log(`\n📜 ПОЛУЧЕН ЛОР: ${result.data.title}`, '#ffcc00');
+                terminalScene.commandLine.log(`Введите "data list" для просмотра всех лоров`, '#888888');
+            }
+        } 
+        else if (result.type === 'upgrade') {
+            if (result.data.upgradeType === 'rayCount') {
+                this.gameConfig.rayCount = result.data.value;
+                this.lidarSystem.updateConfig(this.gameConfig);
+                
+                const terminalScene = this.scene.get('TerminalScene');
+                if (terminalScene && terminalScene.commandLine) {
+                    terminalScene.commandLine.success(`🔧 УЛУЧШЕНИЕ: ${result.data.title}`);
+                    terminalScene.commandLine.log(`rayCount увеличен до ${result.data.value}`, '#00ffcc');
+                }
+            }
         }
+        
+        console.log('Предмет подобран! Осталось:', this.items.length);
+        this.nearItem = null;
+        this.inputManager.showInteractionHint(false);
     }
+}
 
     onResize() {
         this.updateViewports();

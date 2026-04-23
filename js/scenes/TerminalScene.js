@@ -197,19 +197,20 @@ class TerminalScene extends Phaser.Scene {
             this.commandLine.clearCommandHistory();
             this.commandLine.success('История команд очищена');
         }
-        else if (cmd === 'help') {
-            this.commandLine.log('', '#00ffcc');
-            this.commandLine.log('╔══════════════════════════════════════════════════════════╗', '#00ffcc');
-            this.commandLine.log('║  ДОСТУПНЫЕ КОМАНДЫ                                      ║', '#00ffcc');
-            this.commandLine.log('╠══════════════════════════════════════════════════════════╣', '#00ffcc');
-            this.commandLine.log('║  clear        - Очистить экран и память                  ║', '#cccccc');
-            this.commandLine.log('║  clearhistory - Очистить историю команд                  ║', '#cccccc');
-            this.commandLine.log('║  help         - Показать эту справку                     ║', '#cccccc');
-            this.commandLine.log('║  stats        - Показать статистику системы              ║', '#cccccc');
-            this.commandLine.log('║  glitch       - Запустить эффект глитча                  ║', '#cccccc');
-            this.commandLine.log('╚══════════════════════════════════════════════════════════╝', '#00ffcc');
-            this.commandLine.log('', '#00ffcc');
-        } else if (cmd === 'stats') {
+else if (cmd === 'help') {
+    this.commandLine.log('', '#00ffcc');
+    this.commandLine.log('╔══════════════════════════════════════════════════════════╗', '#00ffcc');
+    this.commandLine.log('║  ДОСТУПНЫЕ КОМАНДЫ                                      ║', '#00ffcc');
+    this.commandLine.log('╠══════════════════════════════════════════════════════════╣', '#00ffcc');
+    this.commandLine.log('║  clear   - Очистить экран и память                       ║', '#cccccc');
+    this.commandLine.log('║  help    - Показать эту справку                          ║', '#cccccc');
+    this.commandLine.log('║  stats   - Показать статистику системы                   ║', '#cccccc');
+    this.commandLine.log('║  data list - Показать список полученных данных           ║', '#cccccc');
+    this.commandLine.log('║  data read [номер] - Прочитать данные                    ║', '#cccccc');
+    this.commandLine.log('╚══════════════════════════════════════════════════════════╝', '#00ffcc');
+    this.commandLine.log('', '#00ffcc');
+}
+ else if (cmd === 'stats') {
             const mem = this.registry.get('memory') || 0;
             const maxMem = this.registry.get('maxMemory') || 45;
             const att = this.registry.get('attention') || 0;
@@ -258,7 +259,7 @@ class TerminalScene extends Phaser.Scene {
             this.executeDeviceAction(parseInt(cmd));
         }
 
-else if (cmd === 'testmodetrue') {
+else if (cmd === 'tt') {
     const echoScene = this.scene.get('EchoScene');
     if (echoScene) {
         if (!echoScene.testMode) {
@@ -267,11 +268,14 @@ else if (cmd === 'testmodetrue') {
         echoScene.testMode.enable();
     }
 }
-else if (cmd === 'testmodefalse') {
+else if (cmd === 'tf') {
     const echoScene = this.scene.get('EchoScene');
     if (echoScene && echoScene.testMode) {
         echoScene.testMode.disable();
     }
+}
+else if (cmd === 'data' || cmd.startsWith('data ')) {
+    this.handleDataCommand(cmd);
 }
 
 
@@ -296,6 +300,55 @@ else if (cmd === 'testmodefalse') {
 
 
     }
+
+handleDataCommand(cmd) {
+    const parts = cmd.split(' ');
+    
+    if (parts[1] === 'list') {
+        const loreList = this.registry.get('loreList') || [];
+        
+        if (loreList.length === 0) {
+            this.commandLine.log("Нет полученных данных", '#888888');
+            return;
+        }
+        
+        this.commandLine.log("\n╔══════════════════════════════════════════════════════════╗", '#00ffcc');
+        this.commandLine.log("║  ПОЛУЧЕННЫЕ ДАННЫЕ                                       ║", '#00ffcc');
+        this.commandLine.log("╠══════════════════════════════════════════════════════════╣", '#00ffcc');
+        
+        loreList.forEach((lore, index) => {
+            this.commandLine.log(`║  ${(index + 1).toString().padStart(2)}. ${lore.title.padEnd(47)}║`, '#cccccc');
+        });
+        
+        this.commandLine.log("╚══════════════════════════════════════════════════════════╝", '#00ffcc');
+        this.commandLine.log("Введите 'data read [номер]' для чтения", '#888888');
+    }
+    else if (parts[1] === 'read') {
+        const index = parseInt(parts[2]) - 1;
+        const loreList = this.registry.get('loreList') || [];
+        
+        if (isNaN(index) || index < 0 || index >= loreList.length) {
+            this.commandLine.error("Неверный номер данных");
+            return;
+        }
+        
+        const lore = loreList[index];
+        this.commandLine.log(`\n╔══════════════════════════════════════════════════════════╗`, '#00ffcc');
+        this.commandLine.log(`║  📜 ${lore.title.padEnd(47)}║`, '#ffcc00');
+        this.commandLine.log(`╠══════════════════════════════════════════════════════════╣`, '#00ffcc');
+        
+        // Разбиваем текст на строки
+        const lines = lore.text.match(/.{1,50}/g) || [lore.text];
+        lines.forEach(line => {
+            this.commandLine.log(`║  ${line.padEnd(48)}║`, '#cccccc');
+        });
+        
+        this.commandLine.log(`╚══════════════════════════════════════════════════════════╝`, '#00ffcc');
+    }
+    else {
+        this.commandLine.log("Использование: data list - показать список, data read [номер] - прочитать", '#888888');
+    }
+}
 
 requestDeviceInteraction(device) {
     this.currentDevice = device;
