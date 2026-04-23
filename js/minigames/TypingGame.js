@@ -1,165 +1,157 @@
-class TypingGame {
-    constructor(scene, device, callback) {
-        this.scene = scene;
-        this.device = device;
-        this.callback = callback;
-        this.isActive = true;
-        
-        // Параметры
-        this.targetSequence = "";
+class TypingGameScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'TypingGameScene' });
+        this.device = null;
+        this.callback = null;
         this.userInput = "";
-        this.timeLeft = 9;
-        
-        // Создаем UI (привязанный к камере)
-        this.createUI();
-        this.startGame();
+        this.targetSequence = "";
+        this.timeLeft = 5;
     }
     
-    createUI() {
-        // Получаем координаты центра камеры
-        const centerX = this.scene.cameras.main.centerX;
-        const centerY = this.scene.cameras.main.centerY;
+    init(data) {
+        console.log('[TypingGameScene] init');
+        this.device = data.device;
+        this.callback = data.callback;
+        this.userInput = "";
+        this.targetSequence = this.generateSequence();
+        this.timeLeft = 5;
+    }
+    
+    generateSequence() {
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        let sequence = "";
+        for (let i = 0; i < 6; i++) {
+            sequence += chars[Math.floor(Math.random() * chars.length)];
+        }
+        return sequence;
+    }
+    
+    create() {
+        console.log('[TypingGameScene] create');
         
-        // Затемнение (привязано к камере)
-        this.overlay = this.scene.add.rectangle(centerX, centerY, this.scene.cameras.main.width, this.scene.cameras.main.height, 0x000000, 0.8);
-        this.overlay.setDepth(20000);
-        this.overlay.setScrollFactor(0); // Привязываем к камере
-        this.overlay.setOrigin(0.5, 0.5);
+        const width = this.cameras.main.width;
+        const height = this.cameras.main.height;
+        const centerX = width / 2;
+        const centerY = height / 2;
         
-        // Окно игры (по центру камеры)
+        // Черный фон
+        this.add.rectangle(centerX, centerY, width, height, 0x000000);
+        
+        // Окно игры
         const windowWidth = 500;
         const windowHeight = 300;
         
-        // Фон окна
-        this.windowBg = this.scene.add.rectangle(centerX, centerY, windowWidth, windowHeight, 0x1a1a1a);
-        this.windowBg.setStrokeStyle(2, 0x9b59b6);
-        this.windowBg.setDepth(20001);
-        this.windowBg.setScrollFactor(0); // Привязываем к камере
+        const bg = this.add.rectangle(centerX, centerY, windowWidth, windowHeight, 0x1a1a1a);
+        bg.setStrokeStyle(2, 0x9b59b6);
         
-        // Текст с последовательностью
-        this.sequenceText = this.scene.add.text(centerX, centerY - 60, "", {
+        // Заголовок
+        this.add.text(centerX, centerY - 120, "🔐 ВЗЛОМ УСТРОЙСТВА #1", {
+            fontSize: "24px",
+            color: "#9b59b6",
+            fontFamily: "Courier New",
+            fontWeight: "bold"
+        }).setOrigin(0.5);
+        
+        // Последовательность
+        this.add.text(centerX, centerY - 50, "Введите последовательность:", {
+            fontSize: "14px",
+            color: "#cccccc",
+            fontFamily: "Courier New"
+        }).setOrigin(0.5);
+        
+        this.sequenceText = this.add.text(centerX, centerY + 10, this.targetSequence, {
             fontSize: "40px",
             color: "#00ffcc",
-            fontFamily: "Courier New"
+            fontFamily: "Courier New",
+            fontWeight: "bold"
         }).setOrigin(0.5);
-        this.sequenceText.setDepth(20002);
-        this.sequenceText.setScrollFactor(0); // Привязываем к камере
         
         // Поле ввода
-        this.inputText = this.scene.add.text(centerX, centerY, "", {
-            fontSize: "30px",
+        const inputBg = this.add.rectangle(centerX, centerY + 70, 300, 40, 0x0c0c0c);
+        inputBg.setStrokeStyle(2, 0x9b59b6);
+        
+        this.inputText = this.add.text(centerX - 140, centerY + 70, "", {
+            fontSize: "24px",
             color: "#ffffff",
             fontFamily: "Courier New"
-        }).setOrigin(0.5);
-        this.inputText.setDepth(20002);
-        this.inputText.setScrollFactor(0); // Привязываем к камере
+        }).setOrigin(0, 0.5);
+        
+        this.inputCursor = this.add.rectangle(centerX - 140 + 2, centerY + 70, 2, 30, 0x00ffcc, 1);
+        
+        this.tweens.add({
+            targets: this.inputCursor,
+            alpha: 0,
+            duration: 500,
+            yoyo: true,
+            repeat: -1
+        });
         
         // Таймер
-        this.timerText = this.scene.add.text(centerX, centerY + 80, "", {
-            fontSize: "20px",
+        this.timerText = this.add.text(centerX, centerY + 130, `Время: ${this.timeLeft}с`, {
+            fontSize: "18px",
             color: "#ff6600",
             fontFamily: "Courier New"
         }).setOrigin(0.5);
-        this.timerText.setDepth(20002);
-        this.timerText.setScrollFactor(0); // Привязываем к камере
         
-        // Сообщение
-        this.messageText = this.scene.add.text(centerX, centerY + 130, "", {
-            fontSize: "16px",
+        this.messageText = this.add.text(centerX, centerY + 170, "", {
+            fontSize: "14px",
             color: "#ffff00",
             fontFamily: "Courier New"
         }).setOrigin(0.5);
-        this.messageText.setDepth(20002);
-        this.messageText.setScrollFactor(0); // Привязываем к камере
         
-        // Настройка ввода и блокировка управления
-        this.setupInput();
-        this.lockPlayerControl(true);
-    }
-    
-    lockPlayerControl(lock) {
-        // Блокируем движение игрока
-        const echoScene = this.scene.scene.get('EchoScene');
-        if (echoScene && echoScene.player) {
-            echoScene.player.canMove = !lock;
-        }
+        // Кнопка выхода
+        const closeBtn = this.add.text(centerX + 220, centerY - 130, "✕", {
+            fontSize: "20px",
+            color: "#888888",
+            fontFamily: "Courier New"
+        }).setInteractive({ useHandCursor: true });
         
-        // Блокируем ввод в терминале
-        const terminalScene = this.scene.scene.get('TerminalScene');
-        if (terminalScene) {
-            if (lock) {
-                terminalScene.input.keyboard.enabled = false;
-                if (terminalScene.commandLine) {
-                    terminalScene.commandLine.deactivate();
+        closeBtn.on('pointerover', () => closeBtn.setColor('#ff5555'));
+        closeBtn.on('pointerout', () => closeBtn.setColor('#888888'));
+        closeBtn.on('pointerdown', () => this.finish(false));
+        
+        // Таймер
+        this.timerEvent = this.time.addEvent({
+            delay: 1000,
+            callback: () => {
+                this.timeLeft--;
+                this.timerText.setText(`Время: ${this.timeLeft}с`);
+                if (this.timeLeft <= 0) {
+                    this.timerEvent.remove();
+                    this.finish(false);
                 }
-            } else {
-                terminalScene.input.keyboard.enabled = true;
-            }
-        }
+            },
+            repeat: 4
+        });
         
-        // Блокируем общий ввод в сцене
-        if (echoScene && echoScene.input && echoScene.input.keyboard) {
-            echoScene.input.keyboard.enabled = !lock;
-        }
+        this.setupKeyboard();
     }
     
-    setupInput() {
-        // Обработчик клавиш
-        this.keyHandler = (event) => {
-            if (!this.isActive) return;
-            
+    setupKeyboard() {
+        this.input.keyboard.on('keydown', (event) => {
             if (event.key === 'Enter') {
                 this.checkInput();
                 event.preventDefault();
             } else if (event.key === 'Backspace') {
                 this.userInput = this.userInput.slice(0, -1);
                 this.inputText.setText(this.userInput);
+                const cursorX = this.inputText.x + this.inputText.width + 2;
+                this.inputCursor.setX(cursorX);
                 event.preventDefault();
             } else if (event.key.length === 1 && event.key !== ' ') {
                 this.userInput += event.key.toUpperCase();
                 this.inputText.setText(this.userInput);
-                event.preventDefault();
+                const cursorX = this.inputText.x + this.inputText.width + 2;
+                this.inputCursor.setX(cursorX);
                 
-                // Автоотправка при полном вводе
                 if (this.userInput.length === this.targetSequence.length) {
                     this.checkInput();
                 }
+                event.preventDefault();
             } else if (event.key === 'Escape') {
                 this.finish(false);
                 event.preventDefault();
             }
-        };
-        
-        window.addEventListener('keydown', this.keyHandler);
-    }
-    
-    startGame() {
-        // Генерируем последовательность
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        this.targetSequence = "";
-        for (let i = 0; i < 2; i++) {
-            this.targetSequence += chars[Math.floor(Math.random() * chars.length)];
-        }
-        
-        this.sequenceText.setText(this.targetSequence);
-        this.userInput = "";
-        this.inputText.setText("");
-        this.timeLeft = 10;
-        this.timerText.setText(`Время: ${this.timeLeft}с`);
-        this.messageText.setText("");
-        
-        // Таймер
-        this.timerEvent = this.scene.time.addEvent({
-            delay: 1000,
-            callback: () => {
-                this.timeLeft--;
-                this.timerText.setText(`Время: ${this.timeLeft}с`);
-                
-                if (this.timeLeft <= 0) {
-                    this.finish(false);
-                }
-            },
-            repeat: 4
         });
     }
     
@@ -171,31 +163,29 @@ class TypingGame {
             this.messageText.setColor('#00ff00');
             this.finish(true);
         } else {
-            this.messageText.setText("❌ НЕВЕРНЫЙ КОД!");
+            this.messageText.setText("❌ НЕВЕРНАЯ ПОСЛЕДОВАТЕЛЬНОСТЬ!");
             this.messageText.setColor('#ff5555');
             this.finish(false);
         }
     }
     
     finish(success) {
-        this.isActive = false;
+        console.log('[TypingGameScene] finish:', success);
         
-        // Убираем обработчик
-        if (this.keyHandler) {
-            window.removeEventListener('keydown', this.keyHandler);
+        if (this.timerEvent) this.timerEvent.remove();
+        
+        // Возвращаем управление
+        const echoScene = this.scene.get('EchoScene');
+        if (echoScene && echoScene.player) {
+            echoScene.player.canMove = true;
         }
         
-        // Разблокируем управление
-        this.lockPlayerControl(false);
+        const terminalScene = this.scene.get('TerminalScene');
+        if (terminalScene) {
+            terminalScene.input.keyboard.enabled = true;
+        }
         
-        // Удаляем UI
-        if (this.overlay) this.overlay.destroy();
-        if (this.windowBg) this.windowBg.destroy();
-        if (this.sequenceText) this.sequenceText.destroy();
-        if (this.inputText) this.inputText.destroy();
-        if (this.timerText) this.timerText.destroy();
-        if (this.messageText) this.messageText.destroy();
-        if (this.timerEvent) this.timerEvent.remove();
+        this.scene.stop('TypingGameScene');
         
         if (this.callback) {
             this.callback(success);
@@ -203,4 +193,4 @@ class TypingGame {
     }
 }
 
-window.TypingGame = TypingGame;
+window.TypingGameScene = TypingGameScene;

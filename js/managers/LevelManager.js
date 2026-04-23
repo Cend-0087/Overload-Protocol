@@ -140,7 +140,7 @@ itemsData.forEach(data => {
         this.levelObjects.devices.push(testDevice1);
         this.scene.devices.push(testDevice1);
 
-        const testDevice2 = new Device(this.scene, 1300, 1050, 'computer', "door_main_2");
+        const testDevice2 = new Device(this.scene, 1300, 1050, 'laptop', "door_main_2");
         this.levelObjects.devices.push(testDevice2);
         this.scene.devices.push(testDevice2);
         

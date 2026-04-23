@@ -44,7 +44,7 @@ class EchoScene extends Phaser.Scene {
         // Создание игрока ПОСЛЕ создания стен
         this.player = new Player(this, 450, 360);
 
-// Коллизия с устройствами добавляется в LevelManager при создании устройств
+        // Коллизия с устройствами добавляется в LevelManager при создании устройств
 
 
         // === INPUT MANAGER ===
@@ -86,31 +86,31 @@ class EchoScene extends Phaser.Scene {
         this.currentTransitionZone = null;
         this.pendingTransition = false;
 
-    this.load.audio('calm', '/sounds/спокойная.mp3');
-    this.load.once('complete', () => {
-        console.log('Музыка загружена');
-    });
-    this.load.start();
-    
-    // Создаем MusicManager
-    this.musicManager = new MusicManager(this);
+        this.load.audio('calm', '/sounds/спокойная.mp3');
+        this.load.once('complete', () => {
+            console.log('Музыка загружена');
+        });
+        this.load.start();
 
-const openedDoors = this.registry.get('openedDoors') || [];
-if (openedDoors.length > 0 && this.wallManager) {
-    openedDoors.forEach(doorId => {
-        this.wallManager.openDoor(doorId);
-        console.log(`[EchoScene] Дверь ${doorId} уже была открыта, удаляем`);
-    });
-}
-    
-    // Ждем первое взаимодействие
-    this.input.keyboard.on('keydown', () => {
-        this.musicManager.startMusic();
-    });
-    
-    this.input.on('pointerdown', () => {
-        this.musicManager.startMusic();
-    });
+        // Создаем MusicManager
+        this.musicManager = new MusicManager(this);
+
+        const openedDoors = this.registry.get('openedDoors') || [];
+        if (openedDoors.length > 0 && this.wallManager) {
+            openedDoors.forEach(doorId => {
+                this.wallManager.openDoor(doorId);
+                console.log(`[EchoScene] Дверь ${doorId} уже была открыта, удаляем`);
+            });
+        }
+
+        // Ждем первое взаимодействие
+        this.input.keyboard.on('keydown', () => {
+            this.musicManager.startMusic();
+        });
+
+        this.input.on('pointerdown', () => {
+            this.musicManager.startMusic();
+        });
 
         // Подписка на события
         const uiScene = this.scene.get('UIScene');
@@ -187,47 +187,47 @@ if (openedDoors.length > 0 && this.wallManager) {
         });
     }
 
-setupFirstInteraction() {
-    let interactionHandled = false;
-    
-    const handleFirstInteraction = () => {
-        if (interactionHandled) return;
-        interactionHandled = true;
-        
-        console.log('Первое взаимодействие с игрой - активируем звук');
-        
-        // Инициализируем MusicManager
-        if (this.musicManager) {
-            this.musicManager.init();
-        }
-        
-        // Удаляем обработчики после первого срабатывания
-        this.input.keyboard.off('keydown', handleFirstInteraction);
-        this.input.off('pointerdown', handleFirstInteraction);
-        
-        // Опционально: показать сообщение о включении звука
-        const soundNotification = this.add.text(
-            this.cameras.main.centerX,
-            this.cameras.main.centerY,
-            '🔊 Звук активирован',
-            {
-                fontSize: '24px',
-                fontFamily: 'Courier New',
-                color: '#00ffcc',
-                backgroundColor: '#000000aa',
-                padding: { x: 20, y: 10 }
+    setupFirstInteraction() {
+        let interactionHandled = false;
+
+        const handleFirstInteraction = () => {
+            if (interactionHandled) return;
+            interactionHandled = true;
+
+            console.log('Первое взаимодействие с игрой - активируем звук');
+
+            // Инициализируем MusicManager
+            if (this.musicManager) {
+                this.musicManager.init();
             }
-        ).setOrigin(0.5).setScrollFactor(0).setDepth(10000);
-        
-        this.time.delayedCall(2000, () => {
-            soundNotification.destroy();
-        });
-    };
-    
-    // Вешаем обработчики на любые взаимодействия
-    this.input.keyboard.on('keydown', handleFirstInteraction);
-    this.input.on('pointerdown', handleFirstInteraction);
-}
+
+            // Удаляем обработчики после первого срабатывания
+            this.input.keyboard.off('keydown', handleFirstInteraction);
+            this.input.off('pointerdown', handleFirstInteraction);
+
+            // Опционально: показать сообщение о включении звука
+            const soundNotification = this.add.text(
+                this.cameras.main.centerX,
+                this.cameras.main.centerY,
+                '🔊 Звук активирован',
+                {
+                    fontSize: '24px',
+                    fontFamily: 'Courier New',
+                    color: '#00ffcc',
+                    backgroundColor: '#000000aa',
+                    padding: { x: 20, y: 10 }
+                }
+            ).setOrigin(0.5).setScrollFactor(0).setDepth(10000);
+
+            this.time.delayedCall(2000, () => {
+                soundNotification.destroy();
+            });
+        };
+
+        // Вешаем обработчики на любые взаимодействия
+        this.input.keyboard.on('keydown', handleFirstInteraction);
+        this.input.on('pointerdown', handleFirstInteraction);
+    }
 
     setupCamera() {
         this.cameras.main.startFollow(this.player, true,
@@ -261,49 +261,49 @@ setupFirstInteraction() {
         }
     }
 
-update() {
-    if (this.player && this.player.body && this.player.canMove !== false) {
-        this.player.update(this.inputManager.keys, this.gameConfig.playerSpeed);
+    update() {
+        if (this.player && this.player.body && this.player.canMove !== false) {
+            this.player.update(this.inputManager.keys, this.gameConfig.playerSpeed);
+        }
+
+        if (Phaser.Input.Keyboard.JustDown(this.inputManager.keys.SPACE)) {
+            const pos = this.player.getPosition();
+            this.lidarSystem.emitPulse(pos.x, pos.y, this.walls, this.memoryPoints, this.registry);
+        }
+
+        this.inputManager.update(this.player);
+
+        // Проверка обнаружения объектов
+        this.checkDiscovery();
+
+        this.checkNearbyItems();
+        this.checkTransitionZones();
+        this.checkNearbyDevices();
+
+        if (this.inputManager.justPressedE()) {
+            this.handleInteraction();
+        }
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.inputManager.keys.SPACE)) {
-        const pos = this.player.getPosition();
-        this.lidarSystem.emitPulse(pos.x, pos.y, this.walls, this.memoryPoints, this.registry);
-    }
+    checkDiscovery() {
+        if (!this.player) return;
+        const playerPos = this.player.getPosition();
 
-    this.inputManager.update(this.player);
-    
-    // Проверка обнаружения объектов
-    this.checkDiscovery();
-    
-    this.checkNearbyItems();
-    this.checkTransitionZones();
-    this.checkNearbyDevices();
+        // Проверяем предметы
+        for (let item of this.items) {
+            item.checkDiscovery(playerPos.x, playerPos.y);
+        }
 
-    if (this.inputManager.justPressedE()) {
-        this.handleInteraction();
-    }
-}
+        // Проверяем устройства
+        for (let device of this.devices) {
+            device.checkDiscovery(playerPos.x, playerPos.y);
+        }
 
-checkDiscovery() {
-    if (!this.player) return;
-    const playerPos = this.player.getPosition();
-    
-    // Проверяем предметы
-    for (let item of this.items) {
-        item.checkDiscovery(playerPos.x, playerPos.y);
+        // Проверяем зоны перехода
+        for (let zone of this.transitionZones) {
+            zone.checkDiscovery(playerPos.x, playerPos.y);
+        }
     }
-    
-    // Проверяем устройства
-    for (let device of this.devices) {
-        device.checkDiscovery(playerPos.x, playerPos.y);
-    }
-    
-    // Проверяем зоны перехода
-    for (let zone of this.transitionZones) {
-        zone.checkDiscovery(playerPos.x, playerPos.y);
-    }
-}
 
     checkNearbyItems() {
         if (!this.player) return;
@@ -326,25 +326,25 @@ checkDiscovery() {
 
     }
 
-checkNearbyDevices() {
-    if (!this.player) return;
-    const playerPos = this.player.getPosition();
-    let found = null;
-    
-    for (let device of this.devices) {
-        if (device.canInteract(playerPos.x, playerPos.y)) {
-            found = device;
-            break;
+    checkNearbyDevices() {
+        if (!this.player) return;
+        const playerPos = this.player.getPosition();
+        let found = null;
+
+        for (let device of this.devices) {
+            if (device.canInteract(playerPos.x, playerPos.y)) {
+                found = device;
+                break;
+            }
+        }
+
+        this.nearDevice = found;
+
+        // Показываем подсказку для устройства
+        if (this.nearDevice && !this.nearItem && !this.nearTransitionZone) {
+            this.inputManager.showInteractionHint(true, playerPos.x, playerPos.y - 30);
         }
     }
-    
-    this.nearDevice = found;
-    
-    // Показываем подсказку для устройства
-    if (this.nearDevice && !this.nearItem && !this.nearTransitionZone) {
-        this.inputManager.showInteractionHint(true, playerPos.x, playerPos.y - 30);
-    }
-}
 
     checkTransitionZones() {
         if (!this.player || this.pendingTransition) return;
@@ -364,51 +364,78 @@ checkNearbyDevices() {
         }
     }
 
-handleInteraction() {
-    if (this.nearItem) {
-        this.pickupItem(this.nearItem);
-    } else if (this.nearTransitionZone) {
-        const terminalScene = this.scene.get('TerminalScene');
-        if (terminalScene && !terminalScene.pendingTransition) {
-            const result = this.nearTransitionZone.interact();
-            if (result.success) {
-                terminalScene.requestTransition(this.nearTransitionZone);
+    handleInteraction() {
+        if (this.nearItem) {
+            this.pickupItem(this.nearItem);
+        } else if (this.nearTransitionZone) {
+            const terminalScene = this.scene.get('TerminalScene');
+            if (terminalScene && !terminalScene.pendingTransition) {
+                const result = this.nearTransitionZone.interact();
+                if (result.success) {
+                    terminalScene.requestTransition(this.nearTransitionZone);
+                }
+            }
+        } else if (this.nearDevice) {
+            const terminalScene = this.scene.get('TerminalScene');
+            if (terminalScene) {
+                const result = this.nearDevice.interact();
+                if (result.success) {
+                    terminalScene.requestDeviceInteraction(this.nearDevice);
+                }
             }
         }
-    } else if (this.nearDevice) {
-        const terminalScene = this.scene.get('TerminalScene');
-        if (terminalScene) {
-            const result = this.nearDevice.interact();
-            if (result.success) {
-                terminalScene.requestDeviceInteraction(this.nearDevice);
-            }
+else if (this.nearDevice) {
+    console.log('[EchoScene] Взаимодействие с устройством:', this.nearDevice.deviceType);
+    const terminalScene = this.scene.get('TerminalScene');
+    if (terminalScene) {
+        const result = this.nearDevice.interact();
+        console.log('[EchoScene] Результат взаимодействия:', result);
+        if (result.success && !result.isHacked) {
+            console.log('[EchoScene] Запуск мини-игры');
+            terminalScene.commandLine.log("Запуск взлома...", '#9b59b6');
+            this.miniGameManager.startHackingGame(this.nearDevice, (success) => {
+                console.log('[EchoScene] Результат мини-игры:', success);
+                const hackResult = this.nearDevice.hack(success);
+                if (terminalScene && terminalScene.commandLine) {
+                    terminalScene.commandLine.log(hackResult.message, success ? '#00ff00' : '#ff5555');
+                }
+                
+                if (success && this.nearDevice.data.unlockedDoors.length > 0 && terminalScene) {
+                    terminalScene.commandLine.log("Теперь у вас есть доступ к функциям устройства!", '#00ffcc');
+                    terminalScene.waitingForDeviceAction = true;
+                    terminalScene.currentDevice = this.nearDevice;
+                }
+            });
+        } else if (result.success && result.isHacked && terminalScene) {
+            terminalScene.requestDeviceInteraction(this.nearDevice);
         }
     }
 }
+    }
 
-openDoor(doorId) {
-    console.log(`[EchoScene] Попытка открыть дверь: ${doorId}`);
-    
-    // Используем WallManager для открытия двери
-    if (this.wallManager && this.wallManager.openDoor(doorId)) {
-        const terminalScene = this.scene.get('TerminalScene');
-        if (terminalScene && terminalScene.commandLine) {
-            terminalScene.commandLine.success(`Дверь ${doorId} открыта!`);
-        }
-        
-        // Сохраняем в реестр, что дверь открыта (для сохранения между уровнями)
-        const openedDoors = this.registry.get('openedDoors') || [];
-        if (!openedDoors.includes(doorId)) {
-            openedDoors.push(doorId);
-            this.registry.set('openedDoors', openedDoors);
-        }
-    } else {
-        const terminalScene = this.scene.get('TerminalScene');
-        if (terminalScene && terminalScene.commandLine) {
-            terminalScene.commandLine.error(`Не удалось открыть дверь ${doorId}`);
+    openDoor(doorId) {
+        console.log(`[EchoScene] Попытка открыть дверь: ${doorId}`);
+
+        // Используем WallManager для открытия двери
+        if (this.wallManager && this.wallManager.openDoor(doorId)) {
+            const terminalScene = this.scene.get('TerminalScene');
+            if (terminalScene && terminalScene.commandLine) {
+                terminalScene.commandLine.success(`Дверь ${doorId} открыта!`);
+            }
+
+            // Сохраняем в реестр, что дверь открыта (для сохранения между уровнями)
+            const openedDoors = this.registry.get('openedDoors') || [];
+            if (!openedDoors.includes(doorId)) {
+                openedDoors.push(doorId);
+                this.registry.set('openedDoors', openedDoors);
+            }
+        } else {
+            const terminalScene = this.scene.get('TerminalScene');
+            if (terminalScene && terminalScene.commandLine) {
+                terminalScene.commandLine.error(`Не удалось открыть дверь ${doorId}`);
+            }
         }
     }
-}
 
 
     upgradePlayer(upgrade) {
@@ -423,47 +450,47 @@ openDoor(doorId) {
         }
     }
 
-pickupItem(item) {
-    const result = item.pickup();
-    if (result && result.success) {
-        const index = this.items.indexOf(item);
-        if (index !== -1) this.items.splice(index, 1);
-        
-        // Обрабатываем разные типы предметов
-        if (result.type === 'lore') {
-            // Сохраняем лор в список
-            const loreList = this.registry.get('loreList') || [];
-            loreList.push({
-                id: Date.now(),
-                title: result.data.title,
-                text: result.data.text
-            });
-            this.registry.set('loreList', loreList);
-            
-            const terminalScene = this.scene.get('TerminalScene');
-            if (terminalScene && terminalScene.commandLine) {
-                terminalScene.commandLine.log(`\n📜 ПОЛУЧЕН ЛОР: ${result.data.title}`, '#ffcc00');
-                terminalScene.commandLine.log(`Введите "data list" для просмотра всех лоров`, '#888888');
-            }
-        } 
-        else if (result.type === 'upgrade') {
-            if (result.data.upgradeType === 'rayCount') {
-                this.gameConfig.rayCount = result.data.value;
-                this.lidarSystem.updateConfig(this.gameConfig);
-                
+    pickupItem(item) {
+        const result = item.pickup();
+        if (result && result.success) {
+            const index = this.items.indexOf(item);
+            if (index !== -1) this.items.splice(index, 1);
+
+            // Обрабатываем разные типы предметов
+            if (result.type === 'lore') {
+                // Сохраняем лор в список
+                const loreList = this.registry.get('loreList') || [];
+                loreList.push({
+                    id: Date.now(),
+                    title: result.data.title,
+                    text: result.data.text
+                });
+                this.registry.set('loreList', loreList);
+
                 const terminalScene = this.scene.get('TerminalScene');
                 if (terminalScene && terminalScene.commandLine) {
-                    terminalScene.commandLine.success(`🔧 УЛУЧШЕНИЕ: ${result.data.title}`);
-                    terminalScene.commandLine.log(`rayCount увеличен до ${result.data.value}`, '#00ffcc');
+                    terminalScene.commandLine.log(`\n📜 ПОЛУЧЕН ЛОР: ${result.data.title}`, '#ffcc00');
+                    terminalScene.commandLine.log(`Введите "data list" для просмотра всех лоров`, '#888888');
                 }
             }
+            else if (result.type === 'upgrade') {
+                if (result.data.upgradeType === 'rayCount') {
+                    this.gameConfig.rayCount = result.data.value;
+                    this.lidarSystem.updateConfig(this.gameConfig);
+
+                    const terminalScene = this.scene.get('TerminalScene');
+                    if (terminalScene && terminalScene.commandLine) {
+                        terminalScene.commandLine.success(`🔧 УЛУЧШЕНИЕ: ${result.data.title}`);
+                        terminalScene.commandLine.log(`rayCount увеличен до ${result.data.value}`, '#00ffcc');
+                    }
+                }
+            }
+
+            console.log('Предмет подобран! Осталось:', this.items.length);
+            this.nearItem = null;
+            this.inputManager.showInteractionHint(false);
         }
-        
-        console.log('Предмет подобран! Осталось:', this.items.length);
-        this.nearItem = null;
-        this.inputManager.showInteractionHint(false);
     }
-}
 
     onResize() {
         this.updateViewports();
