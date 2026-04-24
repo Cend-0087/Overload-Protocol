@@ -55,7 +55,7 @@ class TerminalScene extends Phaser.Scene {
 
         // Обработка клавиатуры
         this.input.keyboard.on('keydown', (event) => {
-            if ((event.code === 'Slash' || event.key === '/') && !this.isInputActive) {
+            if ((event.code === 'Slash' || event.key === '/' || event.key === '`' || event.key === '~' || event.code === 'Backquote') && !this.isInputActive) {
                 event.preventDefault();
                 this.activateInput();
             } else {

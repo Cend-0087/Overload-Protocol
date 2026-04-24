@@ -86,7 +86,7 @@ class EchoScene extends Phaser.Scene {
         this.currentTransitionZone = null;
         this.pendingTransition = false;
 
-        this.load.audio('calm', '/sounds/спокойная.mp3');
+        this.load.audio('calm', '/sounds/calm.mp3');
         this.load.once('complete', () => {
             console.log('Музыка загружена');
         });
