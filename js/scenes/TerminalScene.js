@@ -20,6 +20,13 @@ class TerminalScene extends Phaser.Scene {
             this.consoleCamera = uiScene.consoleCamera;
         }
 
+        window.addEventListener('keydown', (event) => {
+            if (event.key === '/' && !this.isInputActive) {
+                event.preventDefault();
+                this.activateInput();
+            }
+        });
+
         // Создаем терминал
         this.commandLine = new CommandLine(this);
         this.commandLine.create();
@@ -39,14 +46,23 @@ class TerminalScene extends Phaser.Scene {
         this.input.on('pointerdown', (pointer) => {
             if (!this.commandLine) return;
 
-            // Проверяем, кликнули ли по области терминала
+            // Получаем реальные координаты терминала относительно экрана
             const terminalBg = this.commandLine.terminalBg;
             if (!terminalBg) return;
 
+            // Используем getBounds с учетом камеры
             const bounds = terminalBg.getBounds();
-            const clickY = pointer.y;
 
-            if (clickY >= bounds.y - bounds.height && clickY <= bounds.y) {
+            // Получаем координаты мыши относительно игрового мира
+            const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+
+            // Проверяем, попадает ли клик в область терминала
+            const isInTerminal = worldPoint.x >= bounds.x &&
+                worldPoint.x <= bounds.x + bounds.width &&
+                worldPoint.y >= bounds.y &&
+                worldPoint.y <= bounds.y + bounds.height;
+
+            if (isInTerminal) {
                 this.activateInput();
             } else {
                 this.deactivateInput();
@@ -55,9 +71,12 @@ class TerminalScene extends Phaser.Scene {
 
         // Обработка клавиатуры
         this.input.keyboard.on('keydown', (event) => {
-            if ((event.code === 'Slash' || event.key === '/' || event.key === '`' || event.key === '~' || event.code === 'Backquote') && !this.isInputActive) {
+            // Предотвращаем стандартное поведение для /
+            if (event.key === '/' || event.code === 'Slash') {
                 event.preventDefault();
-                this.activateInput();
+                if (!this.isInputActive) {
+                    this.activateInput();
+                }
             } else {
                 this.handleTyping(event);
             }
@@ -197,20 +216,20 @@ class TerminalScene extends Phaser.Scene {
             this.commandLine.clearCommandHistory();
             this.commandLine.success('История команд очищена');
         }
-else if (cmd === 'help') {
-    this.commandLine.log('', '#00ffcc');
-    this.commandLine.log('╔══════════════════════════════════════════════════════════╗', '#00ffcc');
-    this.commandLine.log('║  ДОСТУПНЫЕ КОМАНДЫ                                      ║', '#00ffcc');
-    this.commandLine.log('╠══════════════════════════════════════════════════════════╣', '#00ffcc');
-    this.commandLine.log('║  clear   - Очистить экран и память                       ║', '#cccccc');
-    this.commandLine.log('║  help    - Показать эту справку                          ║', '#cccccc');
-    this.commandLine.log('║  stats   - Показать статистику системы                   ║', '#cccccc');
-    this.commandLine.log('║  data list - Показать список полученных данных           ║', '#cccccc');
-    this.commandLine.log('║  data read [номер] - Прочитать данные                    ║', '#cccccc');
-    this.commandLine.log('╚══════════════════════════════════════════════════════════╝', '#00ffcc');
-    this.commandLine.log('', '#00ffcc');
-}
- else if (cmd === 'stats') {
+        else if (cmd === 'help') {
+            this.commandLine.log('', '#00ffcc');
+            this.commandLine.log('╔══════════════════════════════════════════════════════════╗', '#00ffcc');
+            this.commandLine.log('║  ДОСТУПНЫЕ КОМАНДЫ                                      ║', '#00ffcc');
+            this.commandLine.log('╠══════════════════════════════════════════════════════════╣', '#00ffcc');
+            this.commandLine.log('║  clear   - Очистить экран и память                       ║', '#cccccc');
+            this.commandLine.log('║  help    - Показать эту справку                          ║', '#cccccc');
+            this.commandLine.log('║  stats   - Показать статистику системы                   ║', '#cccccc');
+            this.commandLine.log('║  data list - Показать список полученных данных           ║', '#cccccc');
+            this.commandLine.log('║  data read [номер] - Прочитать данные                    ║', '#cccccc');
+            this.commandLine.log('╚══════════════════════════════════════════════════════════╝', '#00ffcc');
+            this.commandLine.log('', '#00ffcc');
+        }
+        else if (cmd === 'stats') {
             const mem = this.registry.get('memory') || 0;
             const maxMem = this.registry.get('maxMemory') || 45;
             const att = this.registry.get('attention') || 0;
@@ -259,24 +278,24 @@ else if (cmd === 'help') {
             this.executeDeviceAction(parseInt(cmd));
         }
 
-else if (cmd === 'tt') {
-    const echoScene = this.scene.get('EchoScene');
-    if (echoScene) {
-        if (!echoScene.testMode) {
-            echoScene.testMode = new TestMode(echoScene);
+        else if (cmd === 'tt') {
+            const echoScene = this.scene.get('EchoScene');
+            if (echoScene) {
+                if (!echoScene.testMode) {
+                    echoScene.testMode = new TestMode(echoScene);
+                }
+                echoScene.testMode.enable();
+            }
         }
-        echoScene.testMode.enable();
-    }
-}
-else if (cmd === 'tf') {
-    const echoScene = this.scene.get('EchoScene');
-    if (echoScene && echoScene.testMode) {
-        echoScene.testMode.disable();
-    }
-}
-else if (cmd === 'data' || cmd.startsWith('data ')) {
-    this.handleDataCommand(cmd);
-}
+        else if (cmd === 'tf') {
+            const echoScene = this.scene.get('EchoScene');
+            if (echoScene && echoScene.testMode) {
+                echoScene.testMode.disable();
+            }
+        }
+        else if (cmd === 'data' || cmd.startsWith('data ')) {
+            this.handleDataCommand(cmd);
+        }
 
 
         else {
@@ -301,137 +320,137 @@ else if (cmd === 'data' || cmd.startsWith('data ')) {
 
     }
 
-handleDataCommand(cmd) {
-    const parts = cmd.split(' ');
-    
-    if (parts[1] === 'list') {
-        const loreList = this.registry.get('loreList') || [];
-        
-        if (loreList.length === 0) {
-            this.commandLine.log("Нет полученных данных", '#888888');
-            return;
-        }
-        
-        this.commandLine.log("\n╔══════════════════════════════════════════════════════════╗", '#00ffcc');
-        this.commandLine.log("║  ПОЛУЧЕННЫЕ ДАННЫЕ                                       ║", '#00ffcc');
-        this.commandLine.log("╠══════════════════════════════════════════════════════════╣", '#00ffcc');
-        
-        loreList.forEach((lore, index) => {
-            this.commandLine.log(`║  ${(index + 1).toString().padStart(2)}. ${lore.title.padEnd(47)}║`, '#cccccc');
-        });
-        
-        this.commandLine.log("╚══════════════════════════════════════════════════════════╝", '#00ffcc');
-        this.commandLine.log("Введите 'data read [номер]' для чтения", '#888888');
-    }
-    else if (parts[1] === 'read') {
-        const index = parseInt(parts[2]) - 1;
-        const loreList = this.registry.get('loreList') || [];
-        
-        if (isNaN(index) || index < 0 || index >= loreList.length) {
-            this.commandLine.error("Неверный номер данных");
-            return;
-        }
-        
-        const lore = loreList[index];
-        this.commandLine.log(`\n╔══════════════════════════════════════════════════════════╗`, '#00ffcc');
-        this.commandLine.log(`║  📜 ${lore.title.padEnd(47)}║`, '#ffcc00');
-        this.commandLine.log(`╠══════════════════════════════════════════════════════════╣`, '#00ffcc');
-        
-        // Разбиваем текст на строки
-        const lines = lore.text.match(/.{1,50}/g) || [lore.text];
-        lines.forEach(line => {
-            this.commandLine.log(`║  ${line.padEnd(48)}║`, '#cccccc');
-        });
-        
-        this.commandLine.log(`╚══════════════════════════════════════════════════════════╝`, '#00ffcc');
-    }
-    else {
-        this.commandLine.log("Использование: data list - показать список, data read [номер] - прочитать", '#888888');
-    }
-}
+    handleDataCommand(cmd) {
+        const parts = cmd.split(' ');
 
-requestDeviceInteraction(device) {
-    this.currentDevice = device;
-    this.waitingForHackCommand = !device.isHacked;
-    this.waitingForDeviceAction = device.isHacked;
-    
-    if (!device.isHacked) {
-        this.commandLine.log("\n🔐 Подключение к устройству установлено", '#9b59b6');
-        this.commandLine.log("Введите 'hack' для взлома", '#ffff00');
-    } else {
-        this.commandLine.log("\n💻 Устройство взломано. Выберите действие:", '#00ffcc');
-        this.commandLine.log("1) Загрузить данные на свой диск", '#cccccc');
-        this.commandLine.log("2) Открыть запертую дверь", '#cccccc');
-        this.commandLine.log("3) Обновить свое ПО", '#cccccc');
-    }
-    
-    this.activateInput();
-}
+        if (parts[1] === 'list') {
+            const loreList = this.registry.get('loreList') || [];
 
-executeDeviceAction(actionNumber) {
-    this.waitingForDeviceAction = false;
-    const result = this.currentDevice.executeAction(actionNumber);
-    
-    if (result.success) {
-        this.commandLine.success(result.message);
-        
-        // Обрабатываем разные типы действий
-        switch(result.type) {
-            case 'download_data':
-                this.commandLine.log(`📀 ${result.lore}`, '#88ff88');
-                // Добавляем в память игрока
-                const currentMemory = this.registry.get('memory') || 0;
-                this.registry.set('memory', currentMemory + 15);
-                break;
-                
-            case 'open_door':
-                // Открываем дверь в EchoScene
-                const echoScene = this.scene.get('EchoScene');
-                if (echoScene && echoScene.openDoor) {
-                    echoScene.openDoor(result.doorId);
-                }
-                break;
-                
-            case 'upgrade_player':
-                // Улучшаем игрока
-                const echoScene2 = this.scene.get('EchoScene');
-                if (echoScene2 && echoScene2.upgradePlayer) {
-                    echoScene2.upgradePlayer(result.upgrade);
-                }
-                break;
-        }
-    } else {
-        this.commandLine.error(result.message);
-    }
-    
-    this.currentDevice = null;
-}
+            if (loreList.length === 0) {
+                this.commandLine.log("Нет полученных данных", '#888888');
+                return;
+            }
 
-handleHackResult(isSuccess) {
-    if (!this.currentDevice) return;
-    
-    const result = this.currentDevice.hack(isSuccess);
-    
-    if (result.success) {
-        this.commandLine.success(result.message);
-        this.commandLine.log("Теперь у вас есть доступ к функциям устройства!", '#00ffcc');
-        this.waitingForDeviceAction = true;
-    } else {
-        this.commandLine.error(result.message);
-        
-        // Увеличиваем внимание при провале
-        if (result.attentionIncrease) {
-            const currentAttention = this.registry.get('attention') || 0;
-            const newAttention = Math.min(currentAttention + result.attentionIncrease, 100);
-            this.registry.set('attention', newAttention);
-            this.commandLine.log(`⚠️ Внимание повышено до ${newAttention}%`, '#ff6600');
+            this.commandLine.log("\n╔══════════════════════════════════════════════════════════╗", '#00ffcc');
+            this.commandLine.log("║  ПОЛУЧЕННЫЕ ДАННЫЕ                                       ║", '#00ffcc');
+            this.commandLine.log("╠══════════════════════════════════════════════════════════╣", '#00ffcc');
+
+            loreList.forEach((lore, index) => {
+                this.commandLine.log(`║  ${(index + 1).toString().padStart(2)}. ${lore.title.padEnd(47)}║`, '#cccccc');
+            });
+
+            this.commandLine.log("╚══════════════════════════════════════════════════════════╝", '#00ffcc');
+            this.commandLine.log("Введите 'data read [номер]' для чтения", '#888888');
         }
-        
-        // Даем еще одну попытку
-        this.commandLine.log("Попробуйте снова: введите 'hack'", '#ffff00');
-        this.waitingForHackCommand = true;
+        else if (parts[1] === 'read') {
+            const index = parseInt(parts[2]) - 1;
+            const loreList = this.registry.get('loreList') || [];
+
+            if (isNaN(index) || index < 0 || index >= loreList.length) {
+                this.commandLine.error("Неверный номер данных");
+                return;
+            }
+
+            const lore = loreList[index];
+            this.commandLine.log(`\n╔══════════════════════════════════════════════════════════╗`, '#00ffcc');
+            this.commandLine.log(`║  📜 ${lore.title.padEnd(47)}║`, '#ffcc00');
+            this.commandLine.log(`╠══════════════════════════════════════════════════════════╣`, '#00ffcc');
+
+            // Разбиваем текст на строки
+            const lines = lore.text.match(/.{1,50}/g) || [lore.text];
+            lines.forEach(line => {
+                this.commandLine.log(`║  ${line.padEnd(48)}║`, '#cccccc');
+            });
+
+            this.commandLine.log(`╚══════════════════════════════════════════════════════════╝`, '#00ffcc');
+        }
+        else {
+            this.commandLine.log("Использование: data list - показать список, data read [номер] - прочитать", '#888888');
+        }
     }
-}
+
+    requestDeviceInteraction(device) {
+        this.currentDevice = device;
+        this.waitingForHackCommand = !device.isHacked;
+        this.waitingForDeviceAction = device.isHacked;
+
+        if (!device.isHacked) {
+            this.commandLine.log("\n🔐 Подключение к устройству установлено", '#9b59b6');
+            this.commandLine.log("Введите 'hack' для взлома", '#ffff00');
+        } else {
+            this.commandLine.log("\n💻 Устройство взломано. Выберите действие:", '#00ffcc');
+            this.commandLine.log("1) Загрузить данные на свой диск", '#cccccc');
+            this.commandLine.log("2) Открыть запертую дверь", '#cccccc');
+            this.commandLine.log("3) Обновить свое ПО", '#cccccc');
+        }
+
+        this.activateInput();
+    }
+
+    executeDeviceAction(actionNumber) {
+        this.waitingForDeviceAction = false;
+        const result = this.currentDevice.executeAction(actionNumber);
+
+        if (result.success) {
+            this.commandLine.success(result.message);
+
+            // Обрабатываем разные типы действий
+            switch (result.type) {
+                case 'download_data':
+                    this.commandLine.log(`📀 ${result.lore}`, '#88ff88');
+                    // Добавляем в память игрока
+                    const currentMemory = this.registry.get('memory') || 0;
+                    this.registry.set('memory', currentMemory + 15);
+                    break;
+
+                case 'open_door':
+                    // Открываем дверь в EchoScene
+                    const echoScene = this.scene.get('EchoScene');
+                    if (echoScene && echoScene.openDoor) {
+                        echoScene.openDoor(result.doorId);
+                    }
+                    break;
+
+                case 'upgrade_player':
+                    // Улучшаем игрока
+                    const echoScene2 = this.scene.get('EchoScene');
+                    if (echoScene2 && echoScene2.upgradePlayer) {
+                        echoScene2.upgradePlayer(result.upgrade);
+                    }
+                    break;
+            }
+        } else {
+            this.commandLine.error(result.message);
+        }
+
+        this.currentDevice = null;
+    }
+
+    handleHackResult(isSuccess) {
+        if (!this.currentDevice) return;
+
+        const result = this.currentDevice.hack(isSuccess);
+
+        if (result.success) {
+            this.commandLine.success(result.message);
+            this.commandLine.log("Теперь у вас есть доступ к функциям устройства!", '#00ffcc');
+            this.waitingForDeviceAction = true;
+        } else {
+            this.commandLine.error(result.message);
+
+            // Увеличиваем внимание при провале
+            if (result.attentionIncrease) {
+                const currentAttention = this.registry.get('attention') || 0;
+                const newAttention = Math.min(currentAttention + result.attentionIncrease, 100);
+                this.registry.set('attention', newAttention);
+                this.commandLine.log(`⚠️ Внимание повышено до ${newAttention}%`, '#ff6600');
+            }
+
+            // Даем еще одну попытку
+            this.commandLine.log("Попробуйте снова: введите 'hack'", '#ffff00');
+            this.waitingForHackCommand = true;
+        }
+    }
 
     startHacking() {
         this.waitingForHackCommand = false;
