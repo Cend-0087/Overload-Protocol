@@ -33,7 +33,6 @@ class GlitchPipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPipeline {
         });
         this.intensity = 0;
         this.isActive = false;
-        console.log('[GlitchPipeline] Пайплайн создан');
     }
 
     onPreRender() {
@@ -45,7 +44,6 @@ class GlitchPipeline extends Phaser.Renderer.WebGL.Pipelines.PostFXPipeline {
     
     // Метод для сброса пайплайна
     reset() {
-        console.log('[GlitchPipeline] Сброс пайплайна, интенсивность была:', this.intensity);
         this.intensity = 0;
     }
 }

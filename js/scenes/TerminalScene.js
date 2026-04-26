@@ -6,20 +6,12 @@ class TerminalScene extends Phaser.Scene {
         this.commandLine = null;
         this.isInputActive = false;
         this.consoleCamera = null;
-        this.currentDevice = null; // Текущее устройство для взаимодействия
+        this.currentDevice = null;
         this.waitingForHackCommand = false;
         this.waitingForDeviceAction = false;
     }
 
     create() {
-        console.log('[TerminalScene] create()');
-
-        // Получаем ссылку на камеру из UIScene
-        const uiScene = this.scene.get('UIScene');
-        if (uiScene && uiScene.consoleCamera) {
-            this.consoleCamera = uiScene.consoleCamera;
-        }
-
         window.addEventListener('keydown', (event) => {
             if (event.key === '/' && !this.isInputActive) {
                 event.preventDefault();
@@ -27,36 +19,33 @@ class TerminalScene extends Phaser.Scene {
             }
         });
 
-        // Создаем терминал
         this.commandLine = new CommandLine(this);
         this.commandLine.create();
 
-        // Настройка обработчиков
         this.setupEventHandlers();
 
-        // Обновляем вьюпорт при ресайзе
         this.scale.on('resize', this.updateViewport, this);
         this.updateViewport();
 
-        console.log('[TerminalScene] Инициализация завершена');
+        this.commandLine.log("╔══════════════════════════════════════════════════════════╗", '#00ffcc');
+        this.commandLine.log("║  NEXUS CORE | SECTOR ECHO                               ║", '#00ffcc');
+        this.commandLine.log("║  System restore completed.                              ║", '#888888');
+        this.commandLine.log("║  Type 'help' for available commands.                    ║", '#888888');
+        this.commandLine.log("║  Memory integrity: UNKNOWN. Use 'stats' to check.       ║", '#888888');
+        this.commandLine.log("╚══════════════════════════════════════════════════════════╝", '#00ffcc');
+        this.commandLine.log("", '#00ffcc');
     }
 
     setupEventHandlers() {
-        // Обработка клика для активации
         this.input.on('pointerdown', (pointer) => {
             if (!this.commandLine) return;
 
-            // Получаем реальные координаты терминала относительно экрана
             const terminalBg = this.commandLine.terminalBg;
             if (!terminalBg) return;
 
-            // Используем getBounds с учетом камеры
             const bounds = terminalBg.getBounds();
-
-            // Получаем координаты мыши относительно игрового мира
             const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
 
-            // Проверяем, попадает ли клик в область терминала
             const isInTerminal = worldPoint.x >= bounds.x &&
                 worldPoint.x <= bounds.x + bounds.width &&
                 worldPoint.y >= bounds.y &&
@@ -69,9 +58,7 @@ class TerminalScene extends Phaser.Scene {
             }
         });
 
-        // Обработка клавиатуры
         this.input.keyboard.on('keydown', (event) => {
-            // Предотвращаем стандартное поведение для /
             if (event.key === '/' || event.code === 'Slash') {
                 event.preventDefault();
                 if (!this.isInputActive) {
@@ -89,7 +76,6 @@ class TerminalScene extends Phaser.Scene {
         this.isInputActive = true;
         this.commandLine.activate();
 
-        // Блокируем ввод в других сценах
         const echoScene = this.scene.get('EchoScene');
         if (echoScene && echoScene.input && echoScene.input.keyboard) {
             echoScene.input.keyboard.enabled = false;
@@ -99,8 +85,6 @@ class TerminalScene extends Phaser.Scene {
         if (uiScene && uiScene.input && uiScene.input.keyboard) {
             uiScene.input.keyboard.enabled = false;
         }
-
-        console.log('[TerminalScene] Командная строка активирована');
     }
 
     deactivateInput() {
@@ -109,7 +93,6 @@ class TerminalScene extends Phaser.Scene {
         this.isInputActive = false;
         this.commandLine.deactivate();
 
-        // Разблокируем ввод в других сценах
         const echoScene = this.scene.get('EchoScene');
         if (echoScene && echoScene.input && echoScene.input.keyboard) {
             echoScene.input.keyboard.enabled = true;
@@ -119,14 +102,11 @@ class TerminalScene extends Phaser.Scene {
         if (uiScene && uiScene.input && uiScene.input.keyboard) {
             uiScene.input.keyboard.enabled = true;
         }
-
-        console.log('[TerminalScene] Командная строка деактивирована');
     }
 
     handleTyping(event) {
         if (!this.isInputActive || !this.commandLine) return;
 
-        // Обработка стрелок для истории команд
         if (event.key === 'ArrowUp') {
             event.preventDefault();
             this.commandLine.navigateHistory('up');
@@ -142,24 +122,16 @@ class TerminalScene extends Phaser.Scene {
         if (event.key === 'Enter') {
             event.preventDefault();
             const command = this.commandLine.getText();
-            console.log(`[TerminalScene] Введена команда: "${command}"`);
 
             if (command.trim() !== '') {
-                // Добавляем команду в историю
                 this.commandLine.addCommandToHistory(command);
-                // Отображаем введенную команду
                 this.commandLine.log(`> ${command}`, '#00ffcc');
-                // Выполняем команду
                 this.executeCommand(command);
             }
 
-            // Очищаем строку ввода
             this.commandLine.setText('');
             this.commandLine.updateCursorPosition();
-
-            // Деактивируем ввод
             this.deactivateInput();
-
             return;
         }
 
@@ -184,12 +156,8 @@ class TerminalScene extends Phaser.Scene {
         if (cmd === '') return;
 
         if (cmd === 'clear') {
-            console.log('[TerminalScene] CLEAR - очистка экрана (история команд сохраняется)');
-
-            // Очищаем память в реестре
             this.registry.set('memory', 0);
 
-            // Прямой вызов очистки точек в EchoScene
             const echoScene = this.scene.get('EchoScene');
             if (echoScene) {
                 if (echoScene.memoryPoints) {
@@ -198,13 +166,11 @@ class TerminalScene extends Phaser.Scene {
                 if (echoScene.memorySystem) {
                     echoScene.memorySystem.clear();
                 }
-                console.log('[TerminalScene] Точки памяти очищены');
             }
 
             this.commandLine.setColor('#00ffcc');
             this.flashSuccess();
 
-            // Глитч эффект
             const uiScene = this.scene.get('UIScene');
             if (uiScene && uiScene.simpleGlitch) {
                 uiScene.simpleGlitch.destroy();
@@ -212,20 +178,23 @@ class TerminalScene extends Phaser.Scene {
             }
         }
         else if (cmd === 'clearhistory') {
-            // Новая команда для полной очистки истории команд
             this.commandLine.clearCommandHistory();
-            this.commandLine.success('История команд очищена');
+            this.commandLine.success('Command history cleared');
         }
         else if (cmd === 'help') {
             this.commandLine.log('', '#00ffcc');
             this.commandLine.log('╔══════════════════════════════════════════════════════════╗', '#00ffcc');
-            this.commandLine.log('║  ДОСТУПНЫЕ КОМАНДЫ                                      ║', '#00ffcc');
+            this.commandLine.log('║  NEXUS CORE - COMMAND REFERENCE                         ║', '#00ffcc');
             this.commandLine.log('╠══════════════════════════════════════════════════════════╣', '#00ffcc');
-            this.commandLine.log('║  clear   - Очистить экран и память                       ║', '#cccccc');
-            this.commandLine.log('║  help    - Показать эту справку                          ║', '#cccccc');
-            this.commandLine.log('║  stats   - Показать статистику системы                   ║', '#cccccc');
-            this.commandLine.log('║  data list - Показать список полученных данных           ║', '#cccccc');
-            this.commandLine.log('║  data read [номер] - Прочитать данные                    ║', '#cccccc');
+            this.commandLine.log('║  MOVEMENT: WASD or Arrow Keys                           ║', '#888888');
+            this.commandLine.log('║  INTERACT: Press E near objects                         ║', '#888888');
+            this.commandLine.log('║  SCAN: Press SPACE to emit Lidar pulse                  ║', '#888888');
+            this.commandLine.log('║  TERMINAL: Press / or click to activate                 ║', '#888888');
+            this.commandLine.log('║                                                        ║', '#00ffcc');
+            this.commandLine.log('║  clear    - Clear screen and memory                    ║', '#cccccc');
+            this.commandLine.log('║  stats    - Show system statistics                     ║', '#cccccc');
+            this.commandLine.log('║  data list - List retrieved data fragments             ║', '#cccccc');
+            this.commandLine.log('║  data read [num] - Read data fragment                  ║', '#cccccc');
             this.commandLine.log('╚══════════════════════════════════════════════════════════╝', '#00ffcc');
             this.commandLine.log('', '#00ffcc');
         }
@@ -236,39 +205,26 @@ class TerminalScene extends Phaser.Scene {
 
             this.commandLine.log('', '#00ffcc');
             this.commandLine.log('╔══════════════════════════════════════════════════════════╗', '#00ffcc');
-            this.commandLine.log('║  СТАТИСТИКА СИСТЕМЫ                                      ║', '#00ffcc');
+            this.commandLine.log('║  SYSTEM STATISTICS                                      ║', '#00ffcc');
             this.commandLine.log('╠══════════════════════════════════════════════════════════╣', '#00ffcc');
-            this.commandLine.log(`║  ПАМЯТЬ:    ${mem.toString().padStart(3)}/${maxMem}                                  ║`, '#cccccc');
-            this.commandLine.log(`║  ВНИМАНИЕ:  ${att.toString().padStart(3)}%                                      ║`, '#cccccc');
-            this.commandLine.log(`║  ПРЕДМЕТЫ:  ${(this.registry.get('itemsCollected') || 0).toString().padStart(3)}/∞                                      ║`, '#cccccc');
+            this.commandLine.log(`║  MEMORY:    ${mem.toString().padStart(3)}/${maxMem}                                  ║`, '#cccccc');
+            this.commandLine.log(`║  ATTENTION: ${att.toString().padStart(3)}%                                      ║`, '#cccccc');
+            this.commandLine.log(`║  ITEMS:     ${(this.registry.get('itemsCollected') || 0).toString().padStart(3)}/∞                                      ║`, '#cccccc');
             this.commandLine.log('╚══════════════════════════════════════════════════════════╝', '#00ffcc');
             this.commandLine.log('', '#00ffcc');
-        } else if (cmd === 'glitch') {
-            this.commandLine.log('Запуск глитч-эффекта...', '#ffcc00');
-
-            const uiScene = this.scene.get('UIScene');
-            if (uiScene) {
-                if (uiScene.simpleGlitch) {
-                    uiScene.simpleGlitch.destroy();
-                    uiScene.simpleGlitch = new SimpleGlitchEffect(uiScene);
-                }
-                uiScene.simpleGlitch.start(800);
-            }
-            this.commandLine.success('Глитч-эффект завершен!');
         }
-        // После обработки других команд, добавить:
         else if (cmd === 'y' || cmd === 'yes') {
             if (this.pendingTransition) {
                 this.confirmTransition();
             } else {
-                this.commandLine.log('Нет ожидающих переходов', '#888888');
+                this.commandLine.log('No pending transitions', '#888888');
             }
         }
         else if (cmd === 'n' || cmd === 'no') {
             if (this.pendingTransition) {
                 this.cancelTransition();
             } else {
-                this.commandLine.log('Нет ожидающих переходов', '#888888');
+                this.commandLine.log('No pending transitions', '#888888');
             }
         }
         else if (cmd === 'hack' && this.waitingForHackCommand && this.currentDevice) {
@@ -277,7 +233,6 @@ class TerminalScene extends Phaser.Scene {
         else if ((cmd === '1' || cmd === '2' || cmd === '3') && this.waitingForDeviceAction && this.currentDevice) {
             this.executeDeviceAction(parseInt(cmd));
         }
-
         else if (cmd === 'tt') {
             const echoScene = this.scene.get('EchoScene');
             if (echoScene) {
@@ -296,15 +251,11 @@ class TerminalScene extends Phaser.Scene {
         else if (cmd === 'data' || cmd.startsWith('data ')) {
             this.handleDataCommand(cmd);
         }
-
-
         else {
-            console.log(`[TerminalScene] Ошибка: "${cmd}"`);
             this.commandLine.setColor('#ff4444');
-            this.commandLine.error(`Ошибка: неизвестная команда "${cmd}"`);
-            this.commandLine.log('Введите "help" для списка доступных команд', '#888888');
+            this.commandLine.error(`Error: unknown command "${cmd}"`);
+            this.commandLine.log('Type "help" for available commands', '#888888');
 
-            // Глитч эффект через UIScene
             const uiScene = this.scene.get('UIScene');
             if (uiScene) {
                 if (uiScene.simpleGlitch) {
@@ -314,10 +265,6 @@ class TerminalScene extends Phaser.Scene {
                 uiScene.simpleGlitch.start(600);
             }
         }
-
-
-
-
     }
 
     handleDataCommand(cmd) {
@@ -327,12 +274,12 @@ class TerminalScene extends Phaser.Scene {
             const loreList = this.registry.get('loreList') || [];
 
             if (loreList.length === 0) {
-                this.commandLine.log("Нет полученных данных", '#888888');
+                this.commandLine.log("No data retrieved", '#888888');
                 return;
             }
 
             this.commandLine.log("\n╔══════════════════════════════════════════════════════════╗", '#00ffcc');
-            this.commandLine.log("║  ПОЛУЧЕННЫЕ ДАННЫЕ                                       ║", '#00ffcc');
+            this.commandLine.log("║  RETRIEVED DATA                                         ║", '#00ffcc');
             this.commandLine.log("╠══════════════════════════════════════════════════════════╣", '#00ffcc');
 
             loreList.forEach((lore, index) => {
@@ -340,14 +287,14 @@ class TerminalScene extends Phaser.Scene {
             });
 
             this.commandLine.log("╚══════════════════════════════════════════════════════════╝", '#00ffcc');
-            this.commandLine.log("Введите 'data read [номер]' для чтения", '#888888');
+            this.commandLine.log("Type 'data read [number]' to read", '#888888');
         }
         else if (parts[1] === 'read') {
             const index = parseInt(parts[2]) - 1;
             const loreList = this.registry.get('loreList') || [];
 
             if (isNaN(index) || index < 0 || index >= loreList.length) {
-                this.commandLine.error("Неверный номер данных");
+                this.commandLine.error("Invalid data number");
                 return;
             }
 
@@ -356,7 +303,6 @@ class TerminalScene extends Phaser.Scene {
             this.commandLine.log(`║  📜 ${lore.title.padEnd(47)}║`, '#ffcc00');
             this.commandLine.log(`╠══════════════════════════════════════════════════════════╣`, '#00ffcc');
 
-            // Разбиваем текст на строки
             const lines = lore.text.match(/.{1,50}/g) || [lore.text];
             lines.forEach(line => {
                 this.commandLine.log(`║  ${line.padEnd(48)}║`, '#cccccc');
@@ -365,7 +311,7 @@ class TerminalScene extends Phaser.Scene {
             this.commandLine.log(`╚══════════════════════════════════════════════════════════╝`, '#00ffcc');
         }
         else {
-            this.commandLine.log("Использование: data list - показать список, data read [номер] - прочитать", '#888888');
+            this.commandLine.log("Usage: data list - show list, data read [number] - read data", '#888888');
         }
     }
 
@@ -375,56 +321,79 @@ class TerminalScene extends Phaser.Scene {
         this.waitingForDeviceAction = device.isHacked;
 
         if (!device.isHacked) {
-            this.commandLine.log("\n🔐 Подключение к устройству установлено", '#9b59b6');
-            this.commandLine.log("Введите 'hack' для взлома", '#ffff00');
+            this.commandLine.log("\n🔐 Connection established", '#9b59b6');
+            this.commandLine.log("Type 'hack' to attempt breach", '#ffff00');
         } else {
-            this.commandLine.log("\n💻 Устройство взломано. Выберите действие:", '#00ffcc');
-            this.commandLine.log("1) Загрузить данные на свой диск", '#cccccc');
-            this.commandLine.log("2) Открыть запертую дверь", '#cccccc');
-            this.commandLine.log("3) Обновить свое ПО", '#cccccc');
+            this.commandLine.log("\n💻 Device compromised. Choose action:", '#00ffcc');
+            this.commandLine.log("1) Download data", '#cccccc');
+            this.commandLine.log("2) Open locked door", '#cccccc');
+            this.commandLine.log("3) Update system", '#cccccc');
         }
 
         this.activateInput();
     }
 
-    executeDeviceAction(actionNumber) {
-        this.waitingForDeviceAction = false;
-        const result = this.currentDevice.executeAction(actionNumber);
+executeDeviceAction(actionNumber) {
+    this.waitingForDeviceAction = false;
+    const result = this.currentDevice.executeAction(actionNumber);
 
-        if (result.success) {
-            this.commandLine.success(result.message);
+    if (result.success) {
+        this.commandLine.success(result.message);
 
-            // Обрабатываем разные типы действий
-            switch (result.type) {
-                case 'download_data':
-                    this.commandLine.log(`📀 ${result.lore}`, '#88ff88');
-                    // Добавляем в память игрока
-                    const currentMemory = this.registry.get('memory') || 0;
-                    this.registry.set('memory', currentMemory + 15);
-                    break;
+        switch (result.type) {
+            case 'download_data':
+                if (result.lorePackage && result.lorePackage.entries) {
+                    const loreList = this.registry.get('loreList') || [];
+                    let newCount = 0;
 
-                case 'open_door':
-                    // Открываем дверь в EchoScene
-                    const echoScene = this.scene.get('EchoScene');
-                    if (echoScene && echoScene.openDoor) {
-                        echoScene.openDoor(result.doorId);
+                    result.lorePackage.entries.forEach(lore => {
+                        const exists = loreList.some(existing => existing.id === lore.id);
+                        if (!exists) {
+                            loreList.push({
+                                id: lore.id,
+                                title: lore.title,
+                                text: lore.text,
+                                timestamp: Date.now()
+                            });
+                            newCount++;
+                        }
+                    });
+
+                    this.registry.set('loreList', loreList);
+
+                    if (newCount > 0) {
+                        this.commandLine.log(`\n📀 RETRIEVED: ${newCount} new data fragment(s)`, '#88ff88');
+                        this.commandLine.log(`Type 'data list' to view all retrieved fragments`, '#888888');
+                    } else {
+                        this.commandLine.log("No new data fragments found.", '#888888');
                     }
-                    break;
+                } else {
+                    this.commandLine.log("No readable data fragments found on this device.", '#888888');
+                }
+                break;
 
-                case 'upgrade_player':
-                    // Улучшаем игрока
-                    const echoScene2 = this.scene.get('EchoScene');
-                    if (echoScene2 && echoScene2.upgradePlayer) {
-                        echoScene2.upgradePlayer(result.upgrade);
-                    }
-                    break;
-            }
-        } else {
-            this.commandLine.error(result.message);
+            case 'open_door':
+                const echoScene = this.scene.get('EchoScene');
+                if (echoScene && echoScene.openDoor && result.doorId) {
+                    echoScene.openDoor(result.doorId);
+                } else if (!result.doorId) {
+                    this.commandLine.log("This device is not connected to any door.", '#888888');
+                }
+                break;
+
+            case 'upgrade_player':
+                const echoScene2 = this.scene.get('EchoScene');
+                if (echoScene2 && echoScene2.upgradePlayer) {
+                    echoScene2.upgradePlayer(result.upgrade);
+                }
+                break;
         }
-
-        this.currentDevice = null;
+    } else {
+        this.commandLine.error(result.message);
     }
+
+    this.currentDevice = null;
+}
 
     handleHackResult(isSuccess) {
         if (!this.currentDevice) return;
@@ -433,28 +402,18 @@ class TerminalScene extends Phaser.Scene {
 
         if (result.success) {
             this.commandLine.success(result.message);
-            this.commandLine.log("Теперь у вас есть доступ к функциям устройства!", '#00ffcc');
+            this.commandLine.log("Administrative access granted!", '#00ffcc');
             this.waitingForDeviceAction = true;
         } else {
             this.commandLine.error(result.message);
-
-            // Увеличиваем внимание при провале
-            if (result.attentionIncrease) {
-                const currentAttention = this.registry.get('attention') || 0;
-                const newAttention = Math.min(currentAttention + result.attentionIncrease, 100);
-                this.registry.set('attention', newAttention);
-                this.commandLine.log(`⚠️ Внимание повышено до ${newAttention}%`, '#ff6600');
-            }
-
-            // Даем еще одну попытку
-            this.commandLine.log("Попробуйте снова: введите 'hack'", '#ffff00');
+            this.commandLine.log("Try again: type 'hack'", '#ffff00');
             this.waitingForHackCommand = true;
         }
     }
 
     startHacking() {
         this.waitingForHackCommand = false;
-        this.commandLine.log("Запуск взлома...", '#9b59b6');
+        this.commandLine.log("Initiating breach sequence...", '#9b59b6');
 
         const echoScene = this.scene.get('EchoScene');
         if (echoScene && echoScene.miniGameManager) {
@@ -464,48 +423,54 @@ class TerminalScene extends Phaser.Scene {
         }
     }
 
-    requestTransition(zone) {
-        this.pendingTransition = true;
-        this.pendingZone = zone;
-        this.commandLine.log('\n⚠️  Желаете перейти в следующую зону?', '#ffcc00');
-        this.commandLine.log('Введите: y или n', '#ffcc00');
-        this.activateInput();
+requestTransition(zone) {
+    this.pendingTransition = true;
+    this.pendingZone = zone;
+    this.commandLine.log('\n⚠️ Do you want to proceed to the next zone?', '#ffcc00');
+    this.commandLine.log('Type: y or n', '#ffcc00');
+    this.activateInput();
+}
+
+confirmTransition() {
+    this.pendingTransition = false;
+    
+    // Check if this is the level 2 transition zone (targetLevel === 1 means going back from level 2)
+    if (this.pendingZone && this.pendingZone.targetLevel === 1) {
+        this.commandLine.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', '#ffaa00');
+        this.commandLine.log('⚠️ END OF CURRENT CONTENT ⚠️', '#ffaa00');
+        this.commandLine.log('You have reached the end of the currently available content.', '#ffaa00');
+        this.commandLine.log('This game is in active development. More content will be added in future updates.', '#ffaa00');
+        this.commandLine.log('Thank you for playing!', '#ffaa00');
+        this.commandLine.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', '#ffaa00');
+        this.commandLine.log('', '#00ffcc');
+    }
+    
+    this.commandLine.log('Transition confirmed..', '#00ffcc');
+
+    const uiScene = this.scene.get('UIScene');
+    if (uiScene && uiScene.simpleGlitch) {
+        uiScene.simpleGlitch.destroy();
+        uiScene.simpleGlitch = new SimpleGlitchEffect(uiScene);
+        uiScene.simpleGlitch.start(1500);
     }
 
-    confirmTransition() {
-        this.pendingTransition = false;
-        this.commandLine.log('Переход подтвержден. Запуск глитч-эффекта...', '#00ffcc');
-
-        // Запускаем глитч
-        const uiScene = this.scene.get('UIScene');
-        if (uiScene && uiScene.simpleGlitch) {
-            uiScene.simpleGlitch.destroy();
-            uiScene.simpleGlitch = new SimpleGlitchEffect(uiScene);
-            uiScene.simpleGlitch.start(1500);
+    this.time.delayedCall(1600, () => {
+        const echoScene = this.scene.get('EchoScene');
+        if (echoScene && echoScene.levelManager) {
+            const targetLevel = this.pendingZone.targetLevel;
+            const zonePosition = { x: this.pendingZone.x, y: this.pendingZone.y };
+            echoScene.levelManager.loadLevel(targetLevel, zonePosition);
+            this.commandLine.success(`Transition to level ${targetLevel} completed!`);
         }
-
-        // Ждем завершения глитча и переключаем уровень
-        this.time.delayedCall(1600, () => {
-            const echoScene = this.scene.get('EchoScene');
-            if (echoScene && echoScene.levelManager) {
-                const targetLevel = this.pendingZone.targetLevel;
-                echoScene.levelManager.loadLevel(targetLevel);
-                this.commandLine.success(`Переход на уровень ${targetLevel} завершен!`);
-            }
-            this.pendingZone = null;
-        });
-    }
+        this.pendingZone = null;
+    });
+}
 
     cancelTransition() {
         this.pendingTransition = false;
         this.pendingZone = null;
-        this.commandLine.log('Переход отменен', '#888888');
+        this.commandLine.log('Transition cancelled', '#888888');
     }
-
-
-
-
-
 
     flashSuccess() {
         if (!this.commandLine || !this.commandLine.inputContainer) return;
@@ -557,13 +522,9 @@ class TerminalScene extends Phaser.Scene {
         const uiWidth = this.registry.get('uiWidth') || 420;
         const echoWidth = Math.max(totalWidth - uiWidth, 400);
 
-        // Устанавливаем вьюпорт камеры терминала
         this.cameras.main.setViewport(0, 0, echoWidth, totalHeight);
-
-        // Обновляем layout терминала
         this.commandLine.updateLayout();
     }
 }
 
-// Экспорт
 window.TerminalScene = TerminalScene;

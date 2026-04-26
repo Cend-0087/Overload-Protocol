@@ -1,43 +1,46 @@
 class Device {
-constructor(scene, x, y, deviceType = 'computer', doorId = null) {
-    this.scene = scene;
-    this.x = x;
-    this.y = y;
-    this.deviceType = deviceType;
-    this.doorId = doorId; // Теперь doorId определен
-    this.radius = 12;
-    this.interactionRadius = 70;
-    this.isActive = true;
-    this.isHacked = false;
-    this.hackAttempts = 0;
-    this.isDiscovered = false;
-    
-    // Визуальное представление - фиолетовый квадрат
-    this.graphics = scene.add.rectangle(x, y, 20, 20, 0x9b59b6, 0.9);
-    this.graphics.setStrokeStyle(2, 0x8e44ad, 1);
-    this.graphics.setDepth(100);
-    this.graphics.setVisible(false);
-    
-    // Добавляем "экран" (маленький белый квадратик внутри)
-    this.screen = scene.add.rectangle(x, y, 12, 12, 0xecf0f1, 0.8);
-    this.screen.setDepth(101);
-    this.screen.setVisible(false);
-    
-    // Добавляем физическое тело
-    scene.physics.add.existing(this.graphics, true);
-    this.body = this.graphics.body;
-    if (this.body) {
-        this.body.setSize(20, 20);
+    constructor(scene, x, y, deviceType = 'computer', doorId = null) {
+        this.scene = scene;
+        this.x = x;
+        this.y = y;
+        this.deviceType = deviceType;
+        this.doorId = doorId;
+        this.radius = 12;
+        this.interactionRadius = 70;
+        this.isActive = true;
+        this.isHacked = false;
+        this.hackAttempts = 0;
+        this.isDiscovered = false;
+        this.objectId = `device_${Date.now()}_${Math.random()}`;
+        
+        // Generate lore package for device (available after hack)
+        this.lorePackage = LoreDB.generateAndStoreLore(this.objectId, 'device');
+        
+        // Visual - purple square
+        this.graphics = scene.add.rectangle(x, y, 20, 20, 0x9b59b6, 0.9);
+        this.graphics.setStrokeStyle(2, 0x8e44ad, 1);
+        this.graphics.setDepth(100);
+        this.graphics.setVisible(false);
+        
+        // Screen
+        this.screen = scene.add.rectangle(x, y, 12, 12, 0xecf0f1, 0.8);
+        this.screen.setDepth(101);
+        this.screen.setVisible(false);
+        
+        // Physics body
+        scene.physics.add.existing(this.graphics, true);
+        this.body = this.graphics.body;
+        if (this.body) {
+            this.body.setSize(20, 20);
+        }
+        
+        // Data storage
+        this.data = {
+            id: this.objectId,
+            type: deviceType,
+            unlockedDoors: doorId ? [doorId] : []
+        };
     }
-    
-    // Хранилище данных
-    this.data = {
-        id: `device_${Date.now()}_${Math.random()}`,
-        type: deviceType,
-        unlockedDoors: doorId ? [doorId] : [],
-        lore: this.getRandomLore()
-    };
-}
     
     checkDiscovery(playerX, playerY) {
         if (!this.isActive || this.isDiscovered) return false;
@@ -62,19 +65,8 @@ constructor(scene, x, y, deviceType = 'computer', doorId = null) {
         
         const terminalScene = this.scene.scene.get('TerminalScene');
         if (terminalScene && terminalScene.commandLine) {
-            terminalScene.commandLine.log(`[ОБНАРУЖЕНО] Устройство: ${this.deviceType}`, '#9b59b6');
+            terminalScene.commandLine.log(`[DETECTED] Device: ${this.deviceType}`, '#9b59b6');
         }
-    }
-    
-    getRandomLore() {
-        const loreMessages = [
-            "Лог 447: Система показывает аномалии в секторе 7...",
-            "Личное сообщение: 'Они знают, что мы здесь'",
-            "Данные экспериментов: Эхо-волны усиливаются при контакте",
-            "Дневник: Сегодня снова видел тени на периферии",
-            "Системный журнал: Несанкционированный доступ к памяти"
-        ];
-        return loreMessages[Math.floor(Math.random() * loreMessages.length)];
     }
     
     canInteract(playerX, playerY) {
@@ -88,20 +80,20 @@ constructor(scene, x, y, deviceType = 'computer', doorId = null) {
     }
     
     interact() {
-        if (!this.isActive || !this.isDiscovered) return { success: false, message: "Устройство не обнаружено" };
+        if (!this.isActive || !this.isDiscovered) return { success: false, message: "Device not detected" };
         
         if (!this.isHacked) {
             return {
                 success: true,
                 isHacked: false,
-                message: "Подключение установлено.\nВведите - hack, чтобы взломать.",
+                message: "Connection established.\nEnter 'hack' to attempt breach.",
                 device: this
             };
         } else {
             return {
                 success: true,
                 isHacked: true,
-                message: "Выберите действие:\n1) Загрузить данные на свой диск.\n2) Открыть запертую дверь.\n3) Обновить свое ПО.",
+                message: "Choose action:\n1) Download data\n2) Open locked door\n3) Update system",
                 device: this
             };
         }
@@ -112,52 +104,64 @@ constructor(scene, x, y, deviceType = 'computer', doorId = null) {
             this.isHacked = true;
             return {
                 success: true,
-                message: "Взлом успешен! Вы получили права администратора на устройстве."
+                message: "Breach successful! Administrative access granted."
             };
         } else {
             this.hackAttempts++;
             return {
                 success: false,
-                message: `Взлом не удался. Попыток: ${this.hackAttempts}/3`,
-                attentionIncrease: 10
+                message: `Breach failed. Attempts: ${this.hackAttempts}/3`,
+                attentionIncrease: 100
             };
         }
     }
     
     executeAction(actionNumber) {
         switch(actionNumber) {
-            case 1:
-                return {
-                    success: true,
-                    type: 'download_data',
-                    message: `Данные загружены: ${this.data.lore}`,
-                    lore: this.data.lore
-                };
-            case 2:
+            case 1: // Download data
+                if (this.lorePackage && this.lorePackage.entries && this.lorePackage.entries.length > 0) {
+                    return {
+                        success: true,
+                        type: 'download_data',
+                        message: `Data downloaded: ${this.lorePackage.entries.length} fragment(s) retrieved.`,
+                        lorePackage: this.lorePackage
+                    };
+                } else {
+                    return {
+                        success: true,
+                        type: 'download_data',
+                        message: "Data downloaded: No readable fragments found. Storage appears empty.",
+                        lorePackage: null
+                    };
+                }
+                
+            case 2: // Open door
                 if (this.data.unlockedDoors.length > 0) {
                     return {
                         success: true,
                         type: 'open_door',
-                        message: "Дверь разблокирована!",
+                        message: "Door unlocked!",
                         doorId: this.data.unlockedDoors[0]
                     };
                 } else {
                     return {
                         success: false,
-                        message: "Нет доступных дверей для открытия"
+                        message: "No accessible doors found"
                     };
                 }
-            case 3:
+                
+            case 3: // Upgrade player
                 return {
                     success: true,
                     type: 'upgrade_player',
-                    message: "ПО обновлено! Характеристики улучшены.",
+                    message: "System update complete! Parameters improved.",
                     upgrade: { speed: 20, memory: 10 }
                 };
+                
             default:
                 return {
                     success: false,
-                    message: "Неверный выбор"
+                    message: "Invalid choice"
                 };
         }
     }

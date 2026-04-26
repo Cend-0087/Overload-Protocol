@@ -62,7 +62,7 @@ class CommandLine {
                            this.inputContainer, this.resizeHandle]);
         
         // Добавляем приветственное сообщение
-        this.addWelcomeMessage();
+        // this.addWelcomeMessage();
         
         // Обновляем позиции
         this.updateLayout();
@@ -297,20 +297,20 @@ scrollToBottom() {
         });
     }
     
-    addWelcomeMessage() {
-        const welcomeMsg = [
-            '╔══════════════════════════════════════════════════════════╗',
-            '║  СИСТЕМНЫЙ ТЕРМИНАЛ v2.0                                 ║',
-            '║  Введите "help" для списка команд                        ║',
-            '║  Введите "clear" для очистки экрана                      ║',
-            '╚══════════════════════════════════════════════════════════╝',
-            ''
-        ];
+    // addWelcomeMessage() {
+    //     const welcomeMsg = [
+    //         '╔══════════════════════════════════════════════════════════╗',
+    //         '║  СИСТЕМНЫЙ ТЕРМИНАЛ v2.0                                 ║',
+    //         '║  Введите "help" для списка команд                        ║',
+    //         '║  Введите "clear" для очистки экрана                      ║',
+    //         '╚══════════════════════════════════════════════════════════╝',
+    //         ''
+    //     ];
         
-        welcomeMsg.forEach(msg => {
-            this.addHistoryLine(msg, '#888888');
-        });
-    }
+    //     welcomeMsg.forEach(msg => {
+    //         this.addHistoryLine(msg, '#888888');
+    //     });
+    // }
     
 addHistoryLine(text, color = '#cccccc', isError = false) {
     const maxWidth = this.getEchoWidth() - 20;

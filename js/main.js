@@ -16,7 +16,7 @@ const config = {
         arcade: { debug: false }
     },
     pipeline: { 'Glitch': GlitchPipeline },
-    scene: [EchoScene, UIScene, TerminalScene, TypingGameScene, PasswordGameScene]
+    scene: [EchoScene, UIScene, TerminalScene, TypingGameScene, PasswordGameScene, AttentionGameScene]
 };
 
 const game = new Phaser.Game(config);

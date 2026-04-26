@@ -25,34 +25,29 @@ class EchoScene extends Phaser.Scene {
     }
 
     create() {
-        // Инициализация систем
         this.memorySystem = new MemorySystem(this.registry);
         this.attentionSystem = new AttentionSystem(this.registry);
         this.testMode = null;
-
+        
         this.memorySystem.init();
         this.attentionSystem.init();
-
-        // Настройка мира
+        
+        this.attentionSystem.setOnOverload(() => {
+            this.startAttentionGame();
+        });
+        
         this.physics.world.setBounds(0, 0, this.gameConfig.worldWidth, this.gameConfig.worldHeight);
         this.cameras.main.setBackgroundColor('#0a0a0a');
 
-        // Создание стен ДО создания игрока
         this.wallManager = new WallManager(this, WallManager.getDefaultWalls());
         this.walls = this.wallManager.create();
 
-        // Создание игрока ПОСЛЕ создания стен
         this.player = new Player(this, 450, 360);
 
-        // Коллизия с устройствами добавляется в LevelManager при создании устройств
-
-
-        // === INPUT MANAGER ===
         this.inputManager = new InputManager(this);
         this.inputManager.init();
 
-        // Создаём подсказку взаимодействия [E]
-        this.interactionHint = this.add.text(0, 0, '[E] Взаимодействовать', {
+        this.interactionHint = this.add.text(0, 0, '[E] INTERACT', {
             fontSize: '18px',
             fontFamily: 'Courier New',
             color: '#00ffcc',
@@ -62,13 +57,9 @@ class EchoScene extends Phaser.Scene {
             .setVisible(false)
             .setDepth(10000);
 
-        // Система лидара
         this.lidarSystem = new LidarSystem(this, this.gameConfig);
-
-        // Группа точек памяти
         this.memoryPoints = this.add.group();
 
-        // === ПРЕДМЕТЫ ===
         this.items = [];
         this.nearItem = null;
         this.transitionZones = [];
@@ -78,32 +69,25 @@ class EchoScene extends Phaser.Scene {
         this.nearDevice = null;
         this.miniGameManager = new MiniGameManager(this);
 
-        // Создаем менеджер уровней
         this.levelManager = new LevelManager(this);
         this.levelManager.loadLevel(1);
 
-        // Ссылка на текущую зону перехода
         this.currentTransitionZone = null;
         this.pendingTransition = false;
 
         this.load.audio('calm', '/sounds/calm.mp3');
-        this.load.once('complete', () => {
-            console.log('Музыка загружена');
-        });
+        this.load.once('complete', () => {});
         this.load.start();
 
-        // Создаем MusicManager
         this.musicManager = new MusicManager(this);
 
         const openedDoors = this.registry.get('openedDoors') || [];
         if (openedDoors.length > 0 && this.wallManager) {
             openedDoors.forEach(doorId => {
                 this.wallManager.openDoor(doorId);
-                console.log(`[EchoScene] Дверь ${doorId} уже была открыта, удаляем`);
             });
         }
 
-        // Ждем первое взаимодействие
         this.input.keyboard.on('keydown', () => {
             this.musicManager.startMusic();
         });
@@ -112,7 +96,6 @@ class EchoScene extends Phaser.Scene {
             this.musicManager.startMusic();
         });
 
-        // Подписка на события
         const uiScene = this.scene.get('UIScene');
         if (uiScene) {
             uiScene.events.on('command-clear', () => {
@@ -121,20 +104,13 @@ class EchoScene extends Phaser.Scene {
             }, this);
         }
 
-        // Управление
         this.cursors = this.input.keyboard.createCursorKeys();
         this.keys = this.input.keyboard.addKeys('W,A,S,D,SPACE');
 
-
-
-        // Разделитель интерфейса
         this.createDivider();
-
-        // Камера
         this.setupCamera();
     }
 
-    // ====================== ДРАГ-РАЗДЕЛИТЕЛЬ ======================
     createDivider() {
         const initialUiWidth = this.registry.get('uiWidth') || 420;
         const initialX = this.scale.width - initialUiWidth;
@@ -194,22 +170,17 @@ class EchoScene extends Phaser.Scene {
             if (interactionHandled) return;
             interactionHandled = true;
 
-            console.log('Первое взаимодействие с игрой - активируем звук');
-
-            // Инициализируем MusicManager
             if (this.musicManager) {
                 this.musicManager.init();
             }
 
-            // Удаляем обработчики после первого срабатывания
             this.input.keyboard.off('keydown', handleFirstInteraction);
             this.input.off('pointerdown', handleFirstInteraction);
 
-            // Опционально: показать сообщение о включении звука
             const soundNotification = this.add.text(
                 this.cameras.main.centerX,
                 this.cameras.main.centerY,
-                '🔊 Звук активирован',
+                '🔊 Audio activated',
                 {
                     fontSize: '24px',
                     fontFamily: 'Courier New',
@@ -224,7 +195,6 @@ class EchoScene extends Phaser.Scene {
             });
         };
 
-        // Вешаем обработчики на любые взаимодействия
         this.input.keyboard.on('keydown', handleFirstInteraction);
         this.input.on('pointerdown', handleFirstInteraction);
     }
@@ -273,9 +243,7 @@ class EchoScene extends Phaser.Scene {
 
         this.inputManager.update(this.player);
 
-        // Проверка обнаружения объектов
         this.checkDiscovery();
-
         this.checkNearbyItems();
         this.checkTransitionZones();
         this.checkNearbyDevices();
@@ -289,17 +257,14 @@ class EchoScene extends Phaser.Scene {
         if (!this.player) return;
         const playerPos = this.player.getPosition();
 
-        // Проверяем предметы
         for (let item of this.items) {
             item.checkDiscovery(playerPos.x, playerPos.y);
         }
 
-        // Проверяем устройства
         for (let device of this.devices) {
             device.checkDiscovery(playerPos.x, playerPos.y);
         }
 
-        // Проверяем зоны перехода
         for (let zone of this.transitionZones) {
             zone.checkDiscovery(playerPos.x, playerPos.y);
         }
@@ -321,9 +286,6 @@ class EchoScene extends Phaser.Scene {
         } else if (!this.nearTransitionZone) {
             this.inputManager.showInteractionHint(false);
         }
-
-
-
     }
 
     checkNearbyDevices() {
@@ -340,7 +302,6 @@ class EchoScene extends Phaser.Scene {
 
         this.nearDevice = found;
 
-        // Показываем подсказку для устройства
         if (this.nearDevice && !this.nearItem && !this.nearTransitionZone) {
             this.inputManager.showInteractionHint(true, playerPos.x, playerPos.y - 30);
         }
@@ -364,6 +325,16 @@ class EchoScene extends Phaser.Scene {
         }
     }
 
+    startAttentionGame() {
+        this.scene.pause('EchoScene');
+        this.scene.pause('UIScene');
+        this.scene.pause('TerminalScene');
+        
+        this.scene.launch('AttentionGameScene', {
+            onComplete: (success) => {}
+        });
+    }
+
     handleInteraction() {
         if (this.nearItem) {
             this.pickupItem(this.nearItem);
@@ -384,46 +355,42 @@ class EchoScene extends Phaser.Scene {
                 }
             }
         }
-else if (this.nearDevice) {
-    console.log('[EchoScene] Взаимодействие с устройством:', this.nearDevice.deviceType);
-    const terminalScene = this.scene.get('TerminalScene');
-    if (terminalScene) {
-        const result = this.nearDevice.interact();
-        console.log('[EchoScene] Результат взаимодействия:', result);
-        if (result.success && !result.isHacked) {
-            console.log('[EchoScene] Запуск мини-игры');
-            terminalScene.commandLine.log("Запуск взлома...", '#9b59b6');
-            this.miniGameManager.startHackingGame(this.nearDevice, (success) => {
-                console.log('[EchoScene] Результат мини-игры:', success);
-                const hackResult = this.nearDevice.hack(success);
-                if (terminalScene && terminalScene.commandLine) {
-                    terminalScene.commandLine.log(hackResult.message, success ? '#00ff00' : '#ff5555');
+        else if (this.nearDevice) {
+            console.log('[EchoScene] interact:', this.nearDevice.deviceType);
+            const terminalScene = this.scene.get('TerminalScene');
+            if (terminalScene) {
+                const result = this.nearDevice.interact();
+                console.log('[EchoScene] Result:', result);
+                if (result.success && !result.isHacked) {
+                    console.log('[EchoScene] launch mini-game');
+                    terminalScene.commandLine.log("hacking...", '#9b59b6');
+                    this.miniGameManager.startHackingGame(this.nearDevice, (success) => {
+                        console.log('[EchoScene] result', success);
+                        const hackResult = this.nearDevice.hack(success);
+                        if (terminalScene && terminalScene.commandLine) {
+                            terminalScene.commandLine.log(hackResult.message, success ? '#00ff00' : '#ff5555');
+                        }
+
+                        if (success && this.nearDevice.data.unlockedDoors.length > 0 && terminalScene) {
+                            terminalScene.commandLine.log("You are admin now!", '#00ffcc');
+                            terminalScene.waitingForDeviceAction = true;
+                            terminalScene.currentDevice = this.nearDevice;
+                        }
+                    });
+                } else if (result.success && result.isHacked && terminalScene) {
+                    terminalScene.requestDeviceInteraction(this.nearDevice);
                 }
-                
-                if (success && this.nearDevice.data.unlockedDoors.length > 0 && terminalScene) {
-                    terminalScene.commandLine.log("Теперь у вас есть доступ к функциям устройства!", '#00ffcc');
-                    terminalScene.waitingForDeviceAction = true;
-                    terminalScene.currentDevice = this.nearDevice;
-                }
-            });
-        } else if (result.success && result.isHacked && terminalScene) {
-            terminalScene.requestDeviceInteraction(this.nearDevice);
+            }
         }
-    }
-}
     }
 
     openDoor(doorId) {
-        console.log(`[EchoScene] Попытка открыть дверь: ${doorId}`);
-
-        // Используем WallManager для открытия двери
         if (this.wallManager && this.wallManager.openDoor(doorId)) {
             const terminalScene = this.scene.get('TerminalScene');
             if (terminalScene && terminalScene.commandLine) {
-                terminalScene.commandLine.success(`Дверь ${doorId} открыта!`);
+                terminalScene.commandLine.success(`Door ${doorId} unlocked!`);
             }
 
-            // Сохраняем в реестр, что дверь открыта (для сохранения между уровнями)
             const openedDoors = this.registry.get('openedDoors') || [];
             if (!openedDoors.includes(doorId)) {
                 openedDoors.push(doorId);
@@ -432,65 +399,93 @@ else if (this.nearDevice) {
         } else {
             const terminalScene = this.scene.get('TerminalScene');
             if (terminalScene && terminalScene.commandLine) {
-                terminalScene.commandLine.error(`Не удалось открыть дверь ${doorId}`);
+                terminalScene.commandLine.error(`Failed to unlock door ${doorId}`);
             }
         }
     }
-
 
     upgradePlayer(upgrade) {
         if (upgrade.speed) {
             this.gameConfig.playerSpeed += upgrade.speed;
-            console.log(`Скорость увеличена до ${this.gameConfig.playerSpeed}`);
         }
         if (upgrade.memory) {
             const currentMax = this.registry.get('maxMemory') || 45;
             this.registry.set('maxMemory', currentMax + upgrade.memory);
-            console.log(`Максимум памяти увеличен до ${this.registry.get('maxMemory')}`);
         }
     }
 
-    pickupItem(item) {
-        const result = item.pickup();
-        if (result && result.success) {
-            const index = this.items.indexOf(item);
-            if (index !== -1) this.items.splice(index, 1);
+pickupItem(item) {
+    const result = item.pickup();
+    if (result && result.success) {
+        const index = this.items.indexOf(item);
+        if (index !== -1) this.items.splice(index, 1);
 
-            // Обрабатываем разные типы предметов
-            if (result.type === 'lore') {
-                // Сохраняем лор в список
+        if (result.type === 'lore') {
+            if (result.lorePackage && result.lorePackage.entries && result.lorePackage.entries.length > 0) {
                 const loreList = this.registry.get('loreList') || [];
-                loreList.push({
-                    id: Date.now(),
-                    title: result.data.title,
-                    text: result.data.text
+                let newCount = 0;
+
+                result.lorePackage.entries.forEach(lore => {
+                    const exists = loreList.some(existing => existing.id === lore.id);
+                    if (!exists) {
+                        loreList.push({
+                            id: lore.id,
+                            title: lore.title,
+                            text: lore.text,
+                            timestamp: Date.now()
+                        });
+                        newCount++;
+                    }
                 });
+
                 this.registry.set('loreList', loreList);
 
                 const terminalScene = this.scene.get('TerminalScene');
                 if (terminalScene && terminalScene.commandLine) {
-                    terminalScene.commandLine.log(`\n📜 ПОЛУЧЕН ЛОР: ${result.data.title}`, '#ffcc00');
-                    terminalScene.commandLine.log(`Введите "data list" для просмотра всех лоров`, '#888888');
+                    if (newCount > 0) {
+                        terminalScene.commandLine.log(`\n📀 RETRIEVED DATA: ${newCount} new fragment(s)`, '#ffcc00');
+                    } else {
+                        terminalScene.commandLine.log(`\n📀 Retrieved data fragment contains no new information.`, '#888888');
+                    }
+                    terminalScene.commandLine.log(`Type 'data list' to view all retrieved fragments`, '#888888');
+                }
+            } else if (result.isEmpty) {
+                const terminalScene = this.scene.get('TerminalScene');
+                if (terminalScene && terminalScene.commandLine) {
+                    terminalScene.commandLine.log(`\n📀 Retrieved data fragment appears to be corrupted or empty.`, '#888888');
                 }
             }
-            else if (result.type === 'upgrade') {
+        }
+        else if (result.type === 'upgrade') {
+            // Handle upgrade
+            const terminalScene = this.scene.get('TerminalScene');
+            if (terminalScene && terminalScene.commandLine) {
+                terminalScene.commandLine.success(`🔧 UPGRADE: ${result.data.title}`);
+                
+                // Apply upgrade based on type
                 if (result.data.upgradeType === 'rayCount') {
                     this.gameConfig.rayCount = result.data.value;
-                    this.lidarSystem.updateConfig(this.gameConfig);
-
-                    const terminalScene = this.scene.get('TerminalScene');
-                    if (terminalScene && terminalScene.commandLine) {
-                        terminalScene.commandLine.success(`🔧 УЛУЧШЕНИЕ: ${result.data.title}`);
-                        terminalScene.commandLine.log(`rayCount увеличен до ${result.data.value}`, '#00ffcc');
+                    if (this.lidarSystem) {
+                        this.lidarSystem.updateConfig(this.gameConfig);
                     }
+                    terminalScene.commandLine.log(`Ray count increased to ${result.data.value}`, '#00ffcc');
+                }
+                else if (result.data.upgradeType === 'memory') {
+                    const currentMax = this.registry.get('maxMemory') || 45;
+                    this.registry.set('maxMemory', currentMax + result.data.value);
+                    terminalScene.commandLine.log(`Memory capacity increased to ${this.registry.get('maxMemory')}`, '#00ffcc');
+                }
+                else if (result.data.upgradeType === 'speed') {
+                    this.gameConfig.playerSpeed += result.data.value;
+                    terminalScene.commandLine.log(`Movement speed increased to ${this.gameConfig.playerSpeed}`, '#00ffcc');
                 }
             }
-
-            console.log('Предмет подобран! Осталось:', this.items.length);
-            this.nearItem = null;
-            this.inputManager.showInteractionHint(false);
         }
+
+        this.nearItem = null;
+        this.inputManager.showInteractionHint(false);
     }
+}
 
     onResize() {
         this.updateViewports();

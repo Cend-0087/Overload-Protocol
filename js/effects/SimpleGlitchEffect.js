@@ -188,7 +188,6 @@ class SimpleGlitchEffect {
     }
     
     destroy() {
-        console.log('[SimpleGlitchEffect] Полное уничтожение эффекта');
         
         // Останавливаем все твины
         this.activeTweens.forEach(tween => {
@@ -218,6 +217,5 @@ class SimpleGlitchEffect {
         });
         
         this.isActive = false;
-        console.log('[SimpleGlitchEffect] Уничтожение завершено');
     }
 }

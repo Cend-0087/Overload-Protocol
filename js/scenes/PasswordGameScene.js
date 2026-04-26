@@ -32,19 +32,16 @@ class PasswordGameScene extends Phaser.Scene {
         const centerX = width / 2;
         const centerY = height / 2;
         
-        // Градиентный фон
         const graphics = this.add.graphics();
         graphics.fillGradientStyle(0x0a0a0a, 0x0a0a0a, 0x1a0a2e, 0x1a0a2e);
         graphics.fillRect(0, 0, width, height);
         
-        // Анимированные частицы на фоне
         this.particles = [];
         for (let i = 0; i < 50; i++) {
             const particle = this.add.circle(Math.random() * width, Math.random() * height, 2, 0x9b59b6, 0.3);
             this.particles.push(particle);
         }
         
-        // Анимация частиц
         this.tweens.add({
             targets: this.particles,
             alpha: 0.1,
@@ -54,61 +51,50 @@ class PasswordGameScene extends Phaser.Scene {
             delay: this.tweens.stagger(100)
         });
         
-        // Главное окно
         const windowWidth = 700;
         const windowHeight = 600;
         
-        // Тень (используем rectangle с прозрачностью)
         const shadow = this.add.rectangle(centerX + 5, centerY + 5, windowWidth, windowHeight, 0x000000, 0.5);
         
-        // Основной фон
         const bg = this.add.rectangle(centerX, centerY, windowWidth, windowHeight, 0x16213e);
         bg.setStrokeStyle(2, 0x9b59b6);
         
-        // Декоративная рамка
         const border = this.add.rectangle(centerX, centerY, windowWidth - 10, windowHeight - 10, 0x000000, 0);
         border.setStrokeStyle(1, 0x6c3483);
         
-        // Заголовок с иконкой
-        this.add.text(centerX, centerY - 260, "⚡ СИСТЕМА ВЗЛОМА v2.0 ⚡", {
+        this.add.text(centerX, centerY - 260, "⚡ BREACH SYSTEM v2.0 ⚡", {
             fontSize: "18px",
             color: "#9b59b6",
             fontFamily: "Courier New",
             fontWeight: "bold"
         }).setOrigin(0.5);
         
-        this.add.text(centerX, centerY - 230, "🔐 ВЗЛОМ УСТРОЙСТВА #2", {
+        this.add.text(centerX, centerY - 230, "🔐 DEVICE BREACH #2", {
             fontSize: "26px",
             color: "#e0e0e0",
             fontFamily: "Courier New",
             fontWeight: "bold"
         }).setOrigin(0.5);
         
-        // Разделитель
         const line = this.add.graphics();
         line.lineStyle(1, 0x9b59b6, 0.5);
         line.lineBetween(centerX - 250, centerY - 200, centerX + 250, centerY - 200);
         
-        // Инструкция
-        this.add.text(centerX, centerY - 180, "НАСТРОЙТЕ ЧАСТОТУ ДЛЯ ОБНАРУЖЕНИЯ СИМВОЛОВ", {
+        this.add.text(centerX, centerY - 180, "ADJUST FREQUENCY TO REVEAL CHARACTERS", {
             fontSize: "12px",
             color: "#888888",
             fontFamily: "Courier New"
         }).setOrigin(0.5);
         
-        // === ШКАЛА ===
         const sliderY = centerY - 100;
         const sliderWidth = 500;
         
-        // Фоновый трек шкалы
         const trackBg = this.add.rectangle(centerX, sliderY, sliderWidth, 8, 0x2c2c44);
         trackBg.setStrokeStyle(1, 0x444466);
         
-        // Заполненная часть
         this.sliderFill = this.add.graphics();
         this.sliderValue = 0;
         
-        // Метки частоты
         const freqLabels = ["30Hz", "50Hz", "100Hz", "200Hz", "400Hz"];
         const positions = [-sliderWidth/2, -sliderWidth/4, 0, sliderWidth/4, sliderWidth/2];
         positions.forEach((pos, i) => {
@@ -121,12 +107,10 @@ class PasswordGameScene extends Phaser.Scene {
             this.add.rectangle(centerX + pos, sliderY - 5, 2, 5, 0x666688);
         });
         
-        // Бегунок
         this.sliderHandle = this.add.circle(centerX, sliderY, 16, 0xffffff);
         this.sliderHandle.setStrokeStyle(3, 0x9b59b6);
         this.sliderHandle.setInteractive({ draggable: true });
         
-        // Эффект свечения бегунка
         this.handleGlow = this.add.circle(centerX, sliderY, 22, 0x9b59b6, 0.3);
         
         this.sliderHandle.on('drag', (pointer, dragX, dragY) => {
@@ -138,7 +122,6 @@ class PasswordGameScene extends Phaser.Scene {
             this.updateSpectrum();
         });
         
-        // === МАТРИЦА СИМВОЛОВ ===
         const matrixY = centerY + 20;
         const slotSize = 70;
         const spacing = 15;
@@ -150,15 +133,12 @@ class PasswordGameScene extends Phaser.Scene {
         this.password.split('').forEach((char, index) => {
             const slotX = startX + (index * (slotSize + spacing));
             
-            // Фоновое свечение
             const glowBg = this.add.rectangle(slotX, matrixY, slotSize, slotSize, 0x9b59b6, 0.1);
             glowBg.setStrokeStyle(0);
             
-            // Основной фон ячейки
             const slotBg = this.add.rectangle(slotX, matrixY, slotSize - 4, slotSize - 4, 0x0c0c1a);
             slotBg.setStrokeStyle(1, 0x2c2c44);
             
-            // Мерцание фона
             this.tweens.add({
                 targets: slotBg,
                 alpha: { from: 0.8, to: 1 },
@@ -168,7 +148,6 @@ class PasswordGameScene extends Phaser.Scene {
                 delay: index * 200
             });
             
-            // Текст символа (изначально невидим)
             const charText = this.add.text(slotX, matrixY, "?", {
                 fontSize: "36px",
                 color: "#1a1a2e",
@@ -176,7 +155,6 @@ class PasswordGameScene extends Phaser.Scene {
                 fontWeight: "bold"
             }).setOrigin(0.5);
             
-            // Тень для текста
             const shadowText = this.add.text(slotX + 2, matrixY + 2, "?", {
                 fontSize: "36px",
                 color: "#000000",
@@ -196,8 +174,7 @@ class PasswordGameScene extends Phaser.Scene {
             });
         });
         
-        // Индикатор сканирования
-        this.scanIndicator = this.add.text(centerX, matrixY + 60, "🔍 СКАНИРОВАНИЕ...", {
+        this.scanIndicator = this.add.text(centerX, matrixY + 60, "🔍 SCANNING...", {
             fontSize: "11px",
             color: "#ffaa00",
             fontFamily: "Courier New"
@@ -211,10 +188,9 @@ class PasswordGameScene extends Phaser.Scene {
             repeat: -1
         });
         
-        // === ПОЛЕ ВВОДА ===
         const inputY = centerY + 150;
         
-        this.add.text(centerX, inputY - 25, "ВВЕДИТЕ ОБНАРУЖЕННЫЙ ПАРОЛЬ", {
+        this.add.text(centerX, inputY - 25, "ENTER DETECTED PASSWORD:", {
             fontSize: "12px",
             color: "#888888",
             fontFamily: "Courier New"
@@ -223,7 +199,6 @@ class PasswordGameScene extends Phaser.Scene {
         const inputBg = this.add.rectangle(centerX, inputY + 5, 350, 45, 0x0c0c1a);
         inputBg.setStrokeStyle(2, 0x9b59b6);
         
-        // Пульсация поля ввода
         this.tweens.add({
             targets: inputBg,
             scaleX: 1.01,
@@ -250,7 +225,7 @@ class PasswordGameScene extends Phaser.Scene {
             repeat: -1
         });
         
-        this.attemptsText = this.add.text(centerX, inputY + 60, `⚠️ ПОПЫТОК ОСТАЛОСЬ: ${this.maxAttempts}`, {
+        this.attemptsText = this.add.text(centerX, inputY + 60, `⚠️ ATTEMPTS LEFT: ${this.maxAttempts}`, {
             fontSize: "14px",
             color: "#ff6600",
             fontFamily: "Courier New",
@@ -263,7 +238,6 @@ class PasswordGameScene extends Phaser.Scene {
             fontFamily: "Courier New"
         }).setOrigin(0.5);
         
-        // Кнопка выхода
         const closeBtn = this.add.text(centerX + 320, centerY - 280, "✕", {
             fontSize: "22px",
             color: "#888888",
@@ -274,10 +248,8 @@ class PasswordGameScene extends Phaser.Scene {
         closeBtn.on('pointerout', () => closeBtn.setColor('#888888'));
         closeBtn.on('pointerdown', () => this.finish(false));
         
-        // Настройка ввода
         this.setupKeyboard();
         
-        // Анимация появления
         this.tweens.add({
             targets: [bg, shadow, border],
             alpha: { from: 0, to: 1 },
@@ -304,12 +276,10 @@ class PasswordGameScene extends Phaser.Scene {
         const charIndex = Math.floor(this.sliderValue / 100 * this.password.length);
         
         this.charSlots.forEach((slot, idx) => {
-            let intensity = 0;
             const distance = Math.abs(idx - charIndex);
             
             if (!slot.revealed) {
                 if (idx === charIndex) {
-                    intensity = 1;
                     slot.text.setText(slot.char);
                     slot.text.setColor('#00ffcc');
                     slot.shadow.setText(slot.char);
@@ -353,10 +323,10 @@ class PasswordGameScene extends Phaser.Scene {
         });
         
         const foundCount = this.charSlots.filter(s => s.revealed).length;
-        this.scanIndicator.setText(`🔍 СКАНИРОВАНИЕ... ${foundCount}/${this.password.length} символов обнаружено`);
+        this.scanIndicator.setText(`🔍 SCANNING... ${foundCount}/${this.password.length} characters detected`);
         
         if (foundCount === this.password.length) {
-            this.scanIndicator.setText(`✅ ВСЕ СИМВОЛЫ ОБНАРУЖЕНЫ! ВВЕДИТЕ ПАРОЛЬ`);
+            this.scanIndicator.setText(`✅ ALL CHARACTERS DETECTED! ENTER PASSWORD`);
             this.scanIndicator.setColor('#00ff00');
         }
     }
@@ -387,7 +357,7 @@ class PasswordGameScene extends Phaser.Scene {
     
     checkPassword() {
         if (this.userInput === this.password) {
-            this.messageText.setText("✅ ДОСТУП РАЗРЕШЕН! ВЗЛОМ УСПЕШЕН");
+            this.messageText.setText("✅ ACCESS GRANTED! BREACH SUCCESSFUL");
             this.messageText.setColor('#00ff00');
             
             this.tweens.add({
@@ -404,13 +374,13 @@ class PasswordGameScene extends Phaser.Scene {
             const attemptsLeft = this.maxAttempts - this.attempts;
             
             if (attemptsLeft <= 0) {
-                this.messageText.setText("❌ ДОСТУП ЗАБЛОКИРОВАН! СЛИШКОМ МНОГО ПОПЫТОК");
+                this.messageText.setText("❌ ACCESS LOCKED! TOO MANY ATTEMPTS");
                 this.messageText.setColor('#ff5555');
                 this.finish(false);
             } else {
-                this.messageText.setText(`❌ НЕВЕРНЫЙ ПАРОЛЬ! ОСТАЛОСЬ ПОПЫТОК: ${attemptsLeft}`);
+                this.messageText.setText(`❌ INCORRECT PASSWORD! ${attemptsLeft} attempts remaining`);
                 this.messageText.setColor('#ff5555');
-                this.attemptsText.setText(`⚠️ ПОПЫТОК ОСТАЛОСЬ: ${attemptsLeft}`);
+                this.attemptsText.setText(`⚠️ ATTEMPTS LEFT: ${attemptsLeft}`);
                 this.userInput = "";
                 this.inputText.setText("");
                 const cursorX = this.inputText.x;

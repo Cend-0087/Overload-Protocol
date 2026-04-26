@@ -6,9 +6,6 @@ class UIScene extends Phaser.Scene {
     }
 
     create() {
-        console.log('[UIScene] create()');
-
-        // Создаем эффект
         this.simpleGlitch = new SimpleGlitchEffect(this);
 
         this.setupCameras();
@@ -18,21 +15,16 @@ class UIScene extends Phaser.Scene {
         this.scale.on('resize', this.updateViewports, this);
         this.startUIUpdates();
 
-        // Для отладки
         window.killGlitch = () => {
             if (this.simpleGlitch) this.simpleGlitch.destroy();
         };
-
-        console.log('[UIScene] Инициализация завершена');
     }
 
     setupCameras() {
         this.cameras.main.setBackgroundColor('#1a1a1a');
-        console.log('[UIScene] Камеры настроены');
     }
 
     createUIElements() {
-        // Только элементы правой панели
         this.uiElements = this.add.container(0, 0);
 
         const title = this.add.text(30, 40, 'SYSTEM INTERFACE', {
@@ -48,8 +40,6 @@ class UIScene extends Phaser.Scene {
         });
 
         this.uiElements.add([title, this.memoryText, this.attentionText]);
-
-        console.log('[UIScene] UI элементы созданы (память и внимание)');
     }
 
     updateViewports() {
@@ -58,16 +48,13 @@ class UIScene extends Phaser.Scene {
         const uiWidth = this.registry.get('uiWidth') || 420;
         const echoWidth = Math.max(totalWidth - uiWidth, 400);
         
-        // Правая камера (UI) - от echoWidth до конца экрана
         this.cameras.main.setViewport(echoWidth, 0, uiWidth, totalHeight);
         
-        // Обновляем разделитель в EchoScene
         const echoScene = this.scene.get('EchoScene');
         if (echoScene && echoScene.updateViewports) {
             echoScene.updateViewports();
         }
         
-        // Обновляем TerminalScene
         const terminalScene = this.scene.get('TerminalScene');
         if (terminalScene && terminalScene.updateViewport) {
             terminalScene.updateViewport();
@@ -94,8 +81,6 @@ class UIScene extends Phaser.Scene {
     }
 
     triggerOverload(duration = 3000) {
-        console.log('[UIScene] Триггер перегрузки системы');
-
         this.registry.set('isOverloaded', true);
 
         const scenes = [this, this.scene.get('EchoScene')];
@@ -116,12 +101,10 @@ class UIScene extends Phaser.Scene {
         this.time.delayedCall(duration, () => {
             this.registry.set('isOverloaded', false);
             this.resetUI();
-            console.log('[UIScene] Перегрузка завершена');
         });
     }
 
     testGlitch() {
-        console.log('[UIScene] РУЧНОЙ ВЫЗОВ ГЛИТЧА');
         this.glitchCounter++;
         if (this.simpleGlitch) {
             this.simpleGlitch.start(600);

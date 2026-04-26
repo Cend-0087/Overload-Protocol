@@ -9,3 +9,12 @@ Press SPACE — and rays scatter into the darkness, briefly revealing walls and 
 You are very small.
 The machine is enormous.
 And it still hasn’t realized you’re no longer just a part of it.
+
+
+
+## Controls
+- **WASD / Arrow Keys** - Movement
+- **E** - Interact with objects
+- **SPACE** - Emit Lidar pulse (reveals environment)
+- **/** - Activate terminal
+- **help** - Show all commands in terminal

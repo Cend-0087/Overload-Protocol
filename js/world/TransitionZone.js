@@ -9,23 +9,19 @@ class TransitionZone {
         this.isActive = true;
         this.isDiscovered = false;
         
-        // Визуальное представление - желтый квадрат
         this.graphics = scene.add.rectangle(x, y, width, height, 0xffaa00, 0.4);
         this.graphics.setStrokeStyle(2, 0xffdd44, 1);
         this.graphics.setVisible(false);
     }
     
-    // Проверка обнаружения - только когда игрок ВНУТРИ зоны
     checkDiscovery(playerX, playerY) {
         if (!this.isActive || this.isDiscovered) return false;
         
-        // Вычисляем границы зоны
         const left = this.x - this.width / 2;
         const right = this.x + this.width / 2;
         const top = this.y - this.height / 2;
         const bottom = this.y + this.height / 2;
         
-        // Проверяем, находится ли игрок ВНУТРИ прямоугольника
         const isInside = playerX >= left && playerX <= right && playerY >= top && playerY <= bottom;
         
         if (isInside) {
@@ -43,20 +39,18 @@ class TransitionZone {
         
         const terminalScene = this.scene.scene.get('TerminalScene');
         if (terminalScene && terminalScene.commandLine) {
-            terminalScene.commandLine.log(`[ОБНАРУЖЕНО] Переходная зона (Уровень ${this.targetLevel})`, '#ffaa00');
+            terminalScene.commandLine.log(`[DETECTED] Transition zone (Level ${this.targetLevel})`, '#ffaa00');
         }
     }
     
     canInteract(playerX, playerY) {
         if (!this.isActive || !this.isDiscovered) return false;
         
-        // Вычисляем границы зоны
         const left = this.x - this.width / 2;
         const right = this.x + this.width / 2;
         const top = this.y - this.height / 2;
         const bottom = this.y + this.height / 2;
         
-        // Взаимодействовать можно только внутри зоны
         const isInside = playerX >= left && playerX <= right && playerY >= top && playerY <= bottom;
         
         return isInside;

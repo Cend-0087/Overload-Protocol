@@ -3,7 +3,7 @@ class WallManager {
         this.scene = scene;
         this.wallsData = wallsData;
         this.walls = null;
-        this.doors = []; // Массив для хранения дверей
+        this.doors = [];
     }
     
     create() {
@@ -14,8 +14,8 @@ class WallManager {
             this.scene.physics.add.existing(wall, true);
             this.walls.add(wall);
             
-            // Если это дверь, сохраняем ссылку
             if (data.isDoor) {
+                console.log(`[WallManager] Door registered: ${data.doorId} at (${data.x}, ${data.y})`);
                 this.doors.push({
                     id: data.doorId,
                     wall: wall,
@@ -27,17 +27,21 @@ class WallManager {
             }
         });
         
+        console.log(`[WallManager] Total doors registered: ${this.doors.length}`);
         return this.walls;
     }
     
-    // Открыть дверь по ID
     openDoor(doorId) {
+        console.log(`[WallManager] Looking for door: ${doorId}`);
+        console.log(`[WallManager] Available doors:`, this.doors.map(d => d.id));
+        
         const door = this.doors.find(d => d.id === doorId);
         if (door && door.wall && door.wall.active) {
-            door.wall.destroy(); // Удаляем стену
-            console.log(`[WallManager] Дверь ${doorId} открыта`);
+            door.wall.destroy();
+            console.log(`[WallManager] Door "${doorId}" opened successfully`);
             return true;
         }
+        console.log(`[WallManager] Door "${doorId}" not found or already destroyed`);
         return false;
     }
     
@@ -46,11 +50,10 @@ class WallManager {
     }
     
     static getDefaultWalls() {
-        const WALL_COLOR = 0x44444; // Объявляем переменную для цвета стен 0x0a0a0a для невидимости
+        const WALL_COLOR = 0x0a0a0a;
         
         return [ 
-
-            // ЗАПЕРТАЯ ДВЕРЬ
+            // Locked Doors for level 1
             { 
                 x: 1370, y: 450, width: 340, height: 20, 
                 color: WALL_COLOR, 
@@ -64,7 +67,7 @@ class WallManager {
                 doorId: "door_main_2" 
             },
             
-            // Верхняя часть
+            // Top part
             { x: 2000, y: 160, width: 1600, height: 20,  color: WALL_COLOR },
             { x: 2700, y: 600, width: 20,  height: 1000, color: WALL_COLOR },
             { x: 1550, y: 330, width: 20,  height: 420, color: WALL_COLOR },
@@ -90,3 +93,5 @@ class WallManager {
         ];
     }
 }
+
+window.WallManager = WallManager;
